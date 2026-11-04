@@ -1,0 +1,2 @@
+ALTER TABLE admin_users
+    MODIFY COLUMN phone VARCHAR(20) NOT NULL;

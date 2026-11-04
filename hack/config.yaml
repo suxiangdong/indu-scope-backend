@@ -1,0 +1,15 @@
+# GoFrame CLI configuration. Database credentials are supplied by command-line
+# arguments or environment variables and must not be stored in this file.
+# https://goframe.org/docs/cli
+gfcli:
+  gen:
+    dao:
+      - descriptionTag: true
+        stdTime: true
+        genTable: true
+        tablesEx: "schema_migrations"
+
+  docker:
+    build: "-a amd64 -s linux -p temp -ew"
+    tagPrefixes:
+      - my.image.pub/my-apppackage auth
