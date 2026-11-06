@@ -13,28 +13,38 @@ import (
 // CategoryAttributes defines the fields of table "category_attributes" with their properties.
 // This map is used internally by GoFrame ORM to understand table structure.
 var CategoryAttributes = map[string]*gdb.TableField{
-	"category_id": {
+	"id": {
 		Index:   0,
-		Name:    "category_id",
+		Name:    "id",
 		Type:    "bigint unsigned",
 		Null:    false,
 		Key:     "PRI",
+		Default: nil,
+		Extra:   "auto_increment",
+		Comment: "",
+	},
+	"category_id": {
+		Index:   1,
+		Name:    "category_id",
+		Type:    "bigint unsigned",
+		Null:    false,
+		Key:     "UNI",
 		Default: nil,
 		Extra:   "",
 		Comment: "",
 	},
 	"attribute_id": {
-		Index:   1,
+		Index:   2,
 		Name:    "attribute_id",
 		Type:    "bigint unsigned",
 		Null:    false,
-		Key:     "PRI",
+		Key:     "MUL",
 		Default: nil,
 		Extra:   "",
 		Comment: "",
 	},
 	"group_id": {
-		Index:   2,
+		Index:   3,
 		Name:    "group_id",
 		Type:    "bigint unsigned",
 		Null:    true,
@@ -44,7 +54,7 @@ var CategoryAttributes = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"is_required": {
-		Index:   3,
+		Index:   4,
 		Name:    "is_required",
 		Type:    "tinyint unsigned",
 		Null:    false,
@@ -54,7 +64,7 @@ var CategoryAttributes = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"is_filterable": {
-		Index:   4,
+		Index:   5,
 		Name:    "is_filterable",
 		Type:    "tinyint unsigned",
 		Null:    false,
@@ -64,7 +74,7 @@ var CategoryAttributes = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"is_searchable": {
-		Index:   5,
+		Index:   6,
 		Name:    "is_searchable",
 		Type:    "tinyint unsigned",
 		Null:    false,
@@ -74,7 +84,7 @@ var CategoryAttributes = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"sort_order": {
-		Index:   6,
+		Index:   7,
 		Name:    "sort_order",
 		Type:    "int unsigned",
 		Null:    false,
@@ -84,7 +94,7 @@ var CategoryAttributes = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"group_name": {
-		Index:   7,
+		Index:   8,
 		Name:    "group_name",
 		Type:    "varchar(100)",
 		Null:    true,
@@ -94,7 +104,7 @@ var CategoryAttributes = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"created_at": {
-		Index:   8,
+		Index:   9,
 		Name:    "created_at",
 		Type:    "datetime(3)",
 		Null:    false,
@@ -104,7 +114,7 @@ var CategoryAttributes = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"updated_at": {
-		Index:   9,
+		Index:   10,
 		Name:    "updated_at",
 		Type:    "datetime(3)",
 		Null:    false,

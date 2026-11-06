@@ -13,18 +13,28 @@ import (
 // CompanyProfiles defines the fields of table "company_profiles" with their properties.
 // This map is used internally by GoFrame ORM to understand table structure.
 var CompanyProfiles = map[string]*gdb.TableField{
-	"user_id": {
+	"id": {
 		Index:   0,
-		Name:    "user_id",
+		Name:    "id",
 		Type:    "bigint unsigned",
 		Null:    false,
 		Key:     "PRI",
+		Default: nil,
+		Extra:   "auto_increment",
+		Comment: "",
+	},
+	"user_id": {
+		Index:   1,
+		Name:    "user_id",
+		Type:    "bigint unsigned",
+		Null:    false,
+		Key:     "UNI",
 		Default: nil,
 		Extra:   "",
 		Comment: "",
 	},
 	"introduction_html": {
-		Index:   1,
+		Index:   2,
 		Name:    "introduction_html",
 		Type:    "longtext",
 		Null:    true,
@@ -34,7 +44,7 @@ var CompanyProfiles = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"offices": {
-		Index:   2,
+		Index:   3,
 		Name:    "offices",
 		Type:    "json",
 		Null:    false,
@@ -44,7 +54,7 @@ var CompanyProfiles = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"factories": {
-		Index:   3,
+		Index:   4,
 		Name:    "factories",
 		Type:    "json",
 		Null:    false,
@@ -54,7 +64,7 @@ var CompanyProfiles = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"created_at": {
-		Index:   4,
+		Index:   5,
 		Name:    "created_at",
 		Type:    "datetime(3)",
 		Null:    false,
@@ -64,7 +74,7 @@ var CompanyProfiles = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"updated_at": {
-		Index:   5,
+		Index:   6,
 		Name:    "updated_at",
 		Type:    "datetime(3)",
 		Null:    false,

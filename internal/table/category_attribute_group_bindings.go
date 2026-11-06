@@ -7,12 +7,13 @@ import (
 )
 
 var CategoryAttributeGroupBindings = map[string]*gdb.TableField{
-	"category_id": {Index: 0, Name: "category_id", Type: "bigint unsigned", Null: false, Key: "PRI"},
-	"group_id":    {Index: 1, Name: "group_id", Type: "bigint unsigned", Null: false, Key: "PRI"},
-	"sort_order":  {Index: 2, Name: "sort_order", Type: "int unsigned", Null: false, Default: "0"},
-	"status":      {Index: 3, Name: "status", Type: "tinyint unsigned", Null: false, Default: "1"},
-	"created_at":  {Index: 4, Name: "created_at", Type: "datetime(3)", Null: false, Default: "CURRENT_TIMESTAMP(3)", Extra: "DEFAULT_GENERATED"},
-	"updated_at":  {Index: 5, Name: "updated_at", Type: "datetime(3)", Null: false, Default: "CURRENT_TIMESTAMP(3)", Extra: "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(3)"},
+	"id":          {Index: 0, Name: "id", Type: "bigint unsigned", Null: false, Key: "PRI", Extra: "auto_increment"},
+	"category_id": {Index: 1, Name: "category_id", Type: "bigint unsigned", Null: false, Key: "UNI"},
+	"group_id":    {Index: 2, Name: "group_id", Type: "bigint unsigned", Null: false, Key: "MUL"},
+	"sort_order":  {Index: 3, Name: "sort_order", Type: "int unsigned", Null: false, Default: "0"},
+	"status":      {Index: 4, Name: "status", Type: "tinyint unsigned", Null: false, Default: "1"},
+	"created_at":  {Index: 5, Name: "created_at", Type: "datetime(3)", Null: false, Default: "CURRENT_TIMESTAMP(3)", Extra: "DEFAULT_GENERATED"},
+	"updated_at":  {Index: 6, Name: "updated_at", Type: "datetime(3)", Null: false, Default: "CURRENT_TIMESTAMP(3)", Extra: "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(3)"},
 }
 
 func SetCategoryAttributeGroupBindingsTableFields(ctx context.Context, db gdb.DB, schema ...string) error {

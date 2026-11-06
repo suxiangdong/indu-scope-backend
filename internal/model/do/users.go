@@ -13,6 +13,7 @@ type Users struct {
 	g.Meta       `orm:"table:users, do:true"`
 	Id           any //
 	Phone        any //
+	WechatOpenID any //
 	PasswordHash any //
 	Status       any //
 	Role         any //

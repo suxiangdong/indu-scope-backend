@@ -13,28 +13,38 @@ import (
 // ProductAttributeValueOptions defines the fields of table "product_attribute_value_options" with their properties.
 // This map is used internally by GoFrame ORM to understand table structure.
 var ProductAttributeValueOptions = map[string]*gdb.TableField{
-	"value_id": {
+	"id": {
 		Index:   0,
-		Name:    "value_id",
+		Name:    "id",
 		Type:    "bigint unsigned",
 		Null:    false,
 		Key:     "PRI",
+		Default: nil,
+		Extra:   "auto_increment",
+		Comment: "",
+	},
+	"value_id": {
+		Index:   1,
+		Name:    "value_id",
+		Type:    "bigint unsigned",
+		Null:    false,
+		Key:     "UNI",
 		Default: nil,
 		Extra:   "",
 		Comment: "",
 	},
 	"option_id": {
-		Index:   1,
+		Index:   2,
 		Name:    "option_id",
 		Type:    "bigint unsigned",
 		Null:    false,
-		Key:     "PRI",
+		Key:     "MUL",
 		Default: nil,
 		Extra:   "",
 		Comment: "",
 	},
 	"created_at": {
-		Index:   2,
+		Index:   3,
 		Name:    "created_at",
 		Type:    "datetime(3)",
 		Null:    false,
@@ -44,7 +54,7 @@ var ProductAttributeValueOptions = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"updated_at": {
-		Index:   3,
+		Index:   4,
 		Name:    "updated_at",
 		Type:    "datetime(3)",
 		Null:    false,

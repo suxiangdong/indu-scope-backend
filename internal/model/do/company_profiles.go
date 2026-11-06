@@ -11,6 +11,7 @@ import (
 // CompanyProfiles is the golang structure of table company_profiles for DAO operations like Where/Data.
 type CompanyProfiles struct {
 	g.Meta           `orm:"table:company_profiles, do:true"`
+	Id               any //
 	UserId           any //
 	IntroductionHtml any //
 	Offices          any //

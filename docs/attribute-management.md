@@ -28,7 +28,7 @@ category_attribute_group_bindings
 | --- | --- |
 | `attributes` | 全局属性定义，例如“平板重量” |
 | `attribute_options` | 单选、多选属性的选项 |
-| `attribute_groups` | 可复用的属性分组，例如“基础参数” |
+| `attribute_groups` | 可复用的属性分组；`name` 用于内部区分，`display_name` 用于前端展示 |
 | `attribute_group_attributes` | 分组包含哪些属性及分组内排序 |
 | `category_attribute_group_bindings` | 哪些分组绑定到哪些叶子类目 |
 | `category_attributes` | 类目级覆盖配置，不再作为主要绑定关系 |
@@ -42,7 +42,7 @@ category_attribute_group_bindings
 1. 在“属性管理”创建全局属性。属性可以暂时不选择分组。
 2. 在“属性分组”创建分组。
 3. 在分组的“管理属性”中加入属性并调整排序。
-4. 在分组的“绑定类目”中选择叶子类目并绑定。
+4. 在分组的“绑定类目”中按一级、二级、三级逐级选择，直到末级类目后绑定。
 5. 在绑定记录上点击“配置属性”，设置该类目下属性是否必填和排序。
 
 同一分组可以复用到多个叶子类目。同一属性也可以加入多个分组。一个属性如果通过多个分组出现在同一类目下，系统按分组排序和属性排序去重；类目级覆盖优先于默认值。
@@ -62,17 +62,18 @@ POST /api/v1/admin/attributes/options/update
 POST /api/v1/admin/attributes/options/delete
 ```
 
-创建或更新属性时可以传递：
+创建或更新属性时不需要传递编码，编码由后端自动生成并在响应中返回：
 
 ```json
 {
-  "code": "tablet_weight",
   "name": "平板重量",
   "value_type": 2,
   "input_type": "single_line",
   "group_ids": [1, 3]
 }
 ```
+
+属性、属性选项和属性分组的编码仅作为系统内部及后续产品数据对接的稳定标识，创建后不可由管理端修改。系统会分别使用 `attr_...`、`opt_...` 和 `group_...` 前缀加短随机标识生成编码，通常不超过 20 个字符。
 
 只有 `select` 和 `multi_select` 输入方式显示和维护选项。
 
@@ -88,9 +89,19 @@ GET  /api/v1/admin/attribute-groups/attributes?group_id=...
 POST /api/v1/admin/attribute-groups/attributes/save
 POST /api/v1/admin/attribute-groups/attributes/delete
 
-GET  /api/v1/admin/category-groups?category_id=...
+GET  /api/v1/admin/category-groups?category_id=...  # 查询某个类目已绑定的分组
+GET  /api/v1/admin/category-groups?group_id=...     # 查询某个分组已绑定的全部类目
 POST /api/v1/admin/category-groups/bind
 POST /api/v1/admin/category-groups/unbind
+```
+
+创建或更新分组时需要同时传递内部名称和前端显示名称；编码不需要传递，由后端自动生成：
+
+```json
+{
+  "name": "tablet_basic",
+  "display_name": "基础参数"
+}
 ```
 
 ### 类目级覆盖
@@ -114,11 +125,13 @@ POST /api/v1/admin/category-attributes/delete
 
 ## 5. 迁移
 
-当前迁移版本为 `000008_normalize_attribute_groups`：
+当前迁移版本为 `000010_add_attribute_group_display_name`：
 
 - `000006_categories_use_zero_parent`：将一级类目的 `parent_id` 统一为 `0`。
 - `000007_create_category_attribute_groups`：建立旧的类目级分组结构。
 - `000008_normalize_attribute_groups`：将旧结构转换为全局分组、分组属性关系和类目分组绑定。
+- `000009_add_ids_to_all_tables`：为此前使用用户主键或联合主键的业务表补充统一的自增 `id` 主键，并保留原有业务唯一约束。
+- `000010_add_attribute_group_display_name`：为属性分组增加独立的前端显示名称，保留 `name` 作为内部区分名称。
 
 执行迁移：
 

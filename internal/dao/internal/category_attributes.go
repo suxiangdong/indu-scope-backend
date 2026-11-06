@@ -21,6 +21,7 @@ type CategoryAttributesDao struct {
 
 // CategoryAttributesColumns defines and stores column names for the table category_attributes.
 type CategoryAttributesColumns struct {
+	Id           string //
 	CategoryId   string //
 	AttributeId  string //
 	GroupId      string //
@@ -35,6 +36,7 @@ type CategoryAttributesColumns struct {
 
 // categoryAttributesColumns holds the columns for the table category_attributes.
 var categoryAttributesColumns = CategoryAttributesColumns{
+	Id:           "id",
 	CategoryId:   "category_id",
 	AttributeId:  "attribute_id",
 	GroupId:      "group_id",

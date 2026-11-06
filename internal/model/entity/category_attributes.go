@@ -10,6 +10,7 @@ import (
 
 // CategoryAttributes is the golang structure for table category_attributes.
 type CategoryAttributes struct {
+	Id           uint64    `json:"id"           orm:"id"           description:""`  //
 	CategoryId   uint64    `json:"categoryId"   orm:"category_id"   description:""` //
 	AttributeId  uint64    `json:"attributeId"  orm:"attribute_id"  description:""` //
 	GroupId      uint64    `json:"groupId"      orm:"group_id"      description:""` //

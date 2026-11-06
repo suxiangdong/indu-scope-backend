@@ -15,6 +15,7 @@ type AttributeGroupAttributesDao struct {
 }
 
 type AttributeGroupAttributesColumns struct {
+	Id          string
 	GroupId     string
 	AttributeId string
 	SortOrder   string
@@ -23,6 +24,7 @@ type AttributeGroupAttributesColumns struct {
 }
 
 var attributeGroupAttributesColumns = AttributeGroupAttributesColumns{
+	Id:      "id",
 	GroupId: "group_id", AttributeId: "attribute_id", SortOrder: "sort_order",
 	CreatedAt: "created_at", UpdatedAt: "updated_at",
 }

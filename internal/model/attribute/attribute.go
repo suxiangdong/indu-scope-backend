@@ -22,7 +22,6 @@ type AttributeItem struct {
 }
 
 type AttributeInput struct {
-	Code            string
 	Name            string
 	ValueType       uint
 	InputType       string
@@ -50,7 +49,6 @@ type AttributeOptionItem struct {
 }
 
 type AttributeOptionInput struct {
-	Code      string
 	Name      string
 	SortOrder uint
 	Status    uint
@@ -61,20 +59,21 @@ type AttributeOptionListResult struct {
 }
 
 type CategoryAttributeItem struct {
-	CategoryID    uint64
-	CategoryName  string
-	AttributeID   uint64
-	AttributeCode string
-	AttributeName string
-	GroupID       *uint64
-	GroupCode     string
-	IsRequired    uint8
-	IsFilterable  uint8
-	IsSearchable  uint8
-	SortOrder     uint
-	GroupName     string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	CategoryID       uint64
+	CategoryName     string
+	AttributeID      uint64
+	AttributeCode    string
+	AttributeName    string
+	GroupID          *uint64
+	GroupCode        string
+	GroupDisplayName string
+	IsRequired       uint8
+	IsFilterable     uint8
+	IsSearchable     uint8
+	SortOrder        uint
+	GroupName        string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type CategoryAttributeInput struct {
@@ -96,6 +95,7 @@ type AttributeGroupItem struct {
 	ID             uint64
 	Code           string
 	Name           string
+	DisplayName    string
 	SortOrder      uint
 	Status         uint8
 	AttributeCount uint
@@ -105,10 +105,10 @@ type AttributeGroupItem struct {
 }
 
 type AttributeGroupInput struct {
-	Code      string
-	Name      string
-	SortOrder uint
-	Status    uint
+	Name        string
+	DisplayName string
+	SortOrder   uint
+	Status      uint
 }
 
 type AttributeGroupListResult struct {
@@ -139,16 +139,17 @@ type AttributeGroupAttributeListResult struct {
 }
 
 type CategoryGroupBindingItem struct {
-	CategoryID     uint64
-	CategoryName   string
-	GroupID        uint64
-	GroupCode      string
-	GroupName      string
-	SortOrder      uint
-	Status         uint8
-	AttributeCount uint
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	CategoryID       uint64
+	CategoryName     string
+	GroupID          uint64
+	GroupCode        string
+	GroupName        string
+	GroupDisplayName string
+	SortOrder        uint
+	Status           uint8
+	AttributeCount   uint
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type CategoryGroupBindingInput struct {

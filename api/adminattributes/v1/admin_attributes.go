@@ -8,7 +8,7 @@ import (
 
 type AttributeInfo struct {
 	ID              int64     `json:"id" dc:"Attribute ID"`
-	Code            string    `json:"code" dc:"Machine-readable attribute code"`
+	Code            string    `json:"code" dc:"System-generated attribute code"`
 	Name            string    `json:"name" dc:"Attribute name"`
 	ValueType       uint8     `json:"value_type" dc:"1 text, 2 integer, 3 decimal, 4 boolean, 5 date, 6 JSON"`
 	InputType       string    `json:"input_type" dc:"Input control type"`
@@ -35,7 +35,6 @@ type ListRes struct {
 
 type CreateReq struct {
 	g.Meta          `path:"/api/v1/admin/attributes/create" tags:"AdminAttributes" method:"post" summary:"Create attribute"`
-	Code            string   `json:"code" v:"required"`
 	Name            string   `json:"name" v:"required"`
 	ValueType       uint     `json:"value_type" v:"required"`
 	InputType       string   `json:"input_type" v:"required"`
@@ -55,7 +54,6 @@ type CreateRes struct {
 type UpdateReq struct {
 	g.Meta          `path:"/api/v1/admin/attributes/update" tags:"AdminAttributes" method:"post" summary:"Update attribute"`
 	ID              uint64   `json:"id" v:"required"`
-	Code            string   `json:"code" v:"required"`
 	Name            string   `json:"name" v:"required"`
 	ValueType       uint     `json:"value_type" v:"required"`
 	InputType       string   `json:"input_type" v:"required"`
@@ -106,7 +104,6 @@ type ListOptionsRes struct {
 type CreateOptionReq struct {
 	g.Meta      `path:"/api/v1/admin/attributes/options/create" tags:"AdminAttributes" method:"post" summary:"Create attribute option"`
 	AttributeID uint64 `json:"attribute_id" v:"required"`
-	Code        string `json:"code" v:"required"`
 	Name        string `json:"name" v:"required"`
 	SortOrder   uint   `json:"sort_order"`
 	Status      *uint  `json:"status"`
@@ -120,7 +117,6 @@ type CreateOptionRes struct {
 type UpdateOptionReq struct {
 	g.Meta    `path:"/api/v1/admin/attributes/options/update" tags:"AdminAttributes" method:"post" summary:"Update attribute option"`
 	ID        uint64 `json:"id" v:"required"`
-	Code      string `json:"code" v:"required"`
 	Name      string `json:"name" v:"required"`
 	SortOrder uint   `json:"sort_order"`
 	Status    *uint  `json:"status"`
@@ -142,20 +138,21 @@ type DeleteOptionRes struct {
 }
 
 type CategoryAttributeInfo struct {
-	CategoryID    int64     `json:"category_id"`
-	CategoryName  string    `json:"category_name"`
-	AttributeID   int64     `json:"attribute_id"`
-	AttributeCode string    `json:"attribute_code"`
-	AttributeName string    `json:"attribute_name"`
-	GroupID       *int64    `json:"group_id,omitempty"`
-	GroupCode     string    `json:"group_code,omitempty"`
-	GroupName     string    `json:"group_name"`
-	IsRequired    uint8     `json:"is_required"`
-	IsFilterable  uint8     `json:"is_filterable"`
-	IsSearchable  uint8     `json:"is_searchable"`
-	SortOrder     uint      `json:"sort_order"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	CategoryID       int64     `json:"category_id"`
+	CategoryName     string    `json:"category_name"`
+	AttributeID      int64     `json:"attribute_id"`
+	AttributeCode    string    `json:"attribute_code"`
+	AttributeName    string    `json:"attribute_name"`
+	GroupID          *int64    `json:"group_id,omitempty"`
+	GroupCode        string    `json:"group_code,omitempty"`
+	GroupName        string    `json:"group_name"`
+	GroupDisplayName string    `json:"group_display_name"`
+	IsRequired       uint8     `json:"is_required"`
+	IsFilterable     uint8     `json:"is_filterable"`
+	IsSearchable     uint8     `json:"is_searchable"`
+	SortOrder        uint      `json:"sort_order"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type ListCategoryBindingsReq struct {
@@ -201,6 +198,7 @@ type AttributeGroupInfo struct {
 	ID             int64     `json:"id"`
 	Code           string    `json:"code"`
 	Name           string    `json:"name"`
+	DisplayName    string    `json:"display_name"`
 	SortOrder      uint      `json:"sort_order"`
 	Status         uint8     `json:"status"`
 	AttributeCount uint      `json:"attribute_count"`
@@ -219,11 +217,11 @@ type ListGroupsRes struct {
 }
 
 type CreateGroupReq struct {
-	g.Meta    `path:"/api/v1/admin/attribute-groups/create" tags:"AdminAttributes" method:"post" summary:"Create reusable attribute group"`
-	Code      string `json:"code" v:"required"`
-	Name      string `json:"name" v:"required"`
-	SortOrder uint   `json:"sort_order"`
-	Status    *uint  `json:"status"`
+	g.Meta      `path:"/api/v1/admin/attribute-groups/create" tags:"AdminAttributes" method:"post" summary:"Create reusable attribute group"`
+	Name        string `json:"name" v:"required"`
+	DisplayName string `json:"display_name" v:"required"`
+	SortOrder   uint   `json:"sort_order"`
+	Status      *uint  `json:"status"`
 }
 
 type CreateGroupRes struct {
@@ -232,12 +230,12 @@ type CreateGroupRes struct {
 }
 
 type UpdateGroupReq struct {
-	g.Meta    `path:"/api/v1/admin/attribute-groups/update" tags:"AdminAttributes" method:"post" summary:"Update reusable attribute group"`
-	ID        uint64 `json:"id" v:"required"`
-	Code      string `json:"code" v:"required"`
-	Name      string `json:"name" v:"required"`
-	SortOrder uint   `json:"sort_order"`
-	Status    *uint  `json:"status"`
+	g.Meta      `path:"/api/v1/admin/attribute-groups/update" tags:"AdminAttributes" method:"post" summary:"Update reusable attribute group"`
+	ID          uint64 `json:"id" v:"required"`
+	Name        string `json:"name" v:"required"`
+	DisplayName string `json:"display_name" v:"required"`
+	SortOrder   uint   `json:"sort_order"`
+	Status      *uint  `json:"status"`
 }
 
 type UpdateGroupRes struct {
@@ -302,21 +300,23 @@ type DeleteGroupAttributeRes struct {
 }
 
 type CategoryGroupInfo struct {
-	CategoryID     int64     `json:"category_id"`
-	CategoryName   string    `json:"category_name"`
-	GroupID        int64     `json:"group_id"`
-	GroupCode      string    `json:"group_code"`
-	GroupName      string    `json:"group_name"`
-	SortOrder      uint      `json:"sort_order"`
-	Status         uint8     `json:"status"`
-	AttributeCount uint      `json:"attribute_count"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	CategoryID       int64     `json:"category_id"`
+	CategoryName     string    `json:"category_name"`
+	GroupID          int64     `json:"group_id"`
+	GroupCode        string    `json:"group_code"`
+	GroupName        string    `json:"group_name"`
+	GroupDisplayName string    `json:"group_display_name"`
+	SortOrder        uint      `json:"sort_order"`
+	Status           uint8     `json:"status"`
+	AttributeCount   uint      `json:"attribute_count"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type ListCategoryGroupsReq struct {
-	g.Meta     `path:"/api/v1/admin/category-groups" tags:"AdminAttributes" method:"get" summary:"List groups bound to a category"`
-	CategoryID uint64 `json:"category_id" v:"required"`
+	g.Meta     `path:"/api/v1/admin/category-groups" tags:"AdminAttributes" method:"get" summary:"List category group bindings"`
+	CategoryID uint64 `json:"category_id"`
+	GroupID    uint64 `json:"group_id"`
 }
 
 type ListCategoryGroupsRes struct {

@@ -11,6 +11,7 @@ import (
 // CategoryAttributes is the golang structure of table category_attributes for DAO operations like Where/Data.
 type CategoryAttributes struct {
 	g.Meta       `orm:"table:category_attributes, do:true"`
+	Id           any //
 	CategoryId   any //
 	AttributeId  any //
 	GroupId      any //

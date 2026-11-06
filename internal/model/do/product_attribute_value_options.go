@@ -11,6 +11,7 @@ import (
 // ProductAttributeValueOptions is the golang structure of table product_attribute_value_options for DAO operations like Where/Data.
 type ProductAttributeValueOptions struct {
 	g.Meta    `orm:"table:product_attribute_value_options, do:true"`
+	Id        any //
 	ValueId   any //
 	OptionId  any //
 	CreatedAt any //

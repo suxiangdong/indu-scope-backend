@@ -15,17 +15,18 @@ type AttributeGroupsDao struct {
 }
 
 type AttributeGroupsColumns struct {
-	Id        string
-	Code      string
-	Name      string
-	SortOrder string
-	Status    string
-	CreatedAt string
-	UpdatedAt string
+	Id          string
+	Code        string
+	Name        string
+	DisplayName string
+	SortOrder   string
+	Status      string
+	CreatedAt   string
+	UpdatedAt   string
 }
 
 var attributeGroupsColumns = AttributeGroupsColumns{
-	Id: "id", Code: "code", Name: "name", SortOrder: "sort_order", Status: "status",
+	Id: "id", Code: "code", Name: "name", DisplayName: "display_name", SortOrder: "sort_order", Status: "status",
 	CreatedAt: "created_at", UpdatedAt: "updated_at",
 }
 

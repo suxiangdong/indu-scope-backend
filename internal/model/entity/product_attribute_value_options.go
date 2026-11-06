@@ -10,6 +10,7 @@ import (
 
 // ProductAttributeValueOptions is the golang structure for table product_attribute_value_options.
 type ProductAttributeValueOptions struct {
+	Id        uint64    `json:"id"        orm:"id"        description:""`  //
 	ValueId   uint64    `json:"valueId"   orm:"value_id"   description:""` //
 	OptionId  uint64    `json:"optionId"  orm:"option_id"  description:""` //
 	CreatedAt time.Time `json:"createdAt" orm:"created_at" description:""` //

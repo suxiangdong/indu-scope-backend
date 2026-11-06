@@ -10,6 +10,7 @@ import (
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/suxiangdong/indu-scope-backend/internal/authutil"
@@ -19,6 +20,7 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/model/do"
 	"github.com/suxiangdong/indu-scope-backend/internal/model/entity"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
+	"github.com/suxiangdong/indu-scope-backend/internal/wechat"
 )
 
 // sAuth implements the generated service.IAuth interface for frontend users.
@@ -35,13 +37,10 @@ func init() {
 	service.RegisterAuth(New())
 }
 
-func (s *sAuth) Register(ctx context.Context, phone, password string, role, userType uint8) (authmodel.AuthResult, error) {
+func (s *sAuth) Register(ctx context.Context, phone, password string, userType uint8) (authmodel.AuthResult, error) {
 	phone = strings.TrimSpace(phone)
 	if err := validateCredentials(phone, password); err != nil {
 		return authmodel.AuthResult{}, err
-	}
-	if role != 1 && role != 2 {
-		return authmodel.AuthResult{}, &consts.InvalidParameterError{Message: "role must be 1 or 2"}
 	}
 	if userType != 1 && userType != 2 {
 		return authmodel.AuthResult{}, &consts.InvalidParameterError{Message: "user_type must be 1 or 2"}
@@ -55,7 +54,7 @@ func (s *sAuth) Register(ctx context.Context, phone, password string, role, user
 		Phone:        phone,
 		PasswordHash: string(hash),
 		Status:       0,
-		Role:         role,
+		Role:         0,
 		UserType:     userType,
 	}).InsertAndGetId()
 	if err != nil {
@@ -65,7 +64,7 @@ func (s *sAuth) Register(ctx context.Context, phone, password string, role, user
 		return authmodel.AuthResult{}, gerror.Wrap(err, "create user")
 	}
 	result, err := authutil.IssueUserToken(ctx, authmodel.User{
-		ID: id, Phone: phone, Role: role, UserType: userType, Status: 0,
+		ID: id, Phone: phone, Role: 0, UserType: userType, Status: 0,
 	})
 	if err != nil {
 		return authmodel.AuthResult{}, err
@@ -113,6 +112,108 @@ func (s *sAuth) Login(ctx context.Context, phone, password string) (authmodel.Au
 		return authmodel.AuthResult{}, gerror.Wrap(err, "create user session")
 	}
 	return result, nil
+}
+
+func (s *sAuth) WechatPhoneLogin(ctx context.Context, loginCode, phoneCode string) (authmodel.AuthResult, error) {
+	loginCode, phoneCode = strings.TrimSpace(loginCode), strings.TrimSpace(phoneCode)
+	if loginCode == "" || phoneCode == "" {
+		return authmodel.AuthResult{}, &consts.InvalidParameterError{Message: "wechat login code and phone code are required"}
+	}
+	loginSession, err := wechat.ResolveLoginCode(ctx, loginCode)
+	if err != nil {
+		return authmodel.AuthResult{}, gerror.Wrap(err, "wechat login")
+	}
+	openID := strings.TrimSpace(loginSession.OpenID)
+	if openID == "" {
+		return authmodel.AuthResult{}, consts.ErrWechatLoginInvalid
+	}
+	phone, err := wechat.ResolvePhoneCode(ctx, phoneCode)
+	if err != nil {
+		return authmodel.AuthResult{}, gerror.Wrap(err, "wechat phone login")
+	}
+	phone = strings.TrimSpace(phone)
+	if err := validatePhone(phone); err != nil {
+		return authmodel.AuthResult{}, err
+	}
+
+	var byOpenID *wechatUserRecord
+	err = dao.Users.Ctx(ctx).
+		Fields("id, phone, password_hash, status, role, user_type, wechat_openid").
+		Where("wechat_openid", openID).
+		Scan(&byOpenID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return authmodel.AuthResult{}, gerror.Wrap(err, "query wechat user")
+	}
+	if byOpenID != nil && byOpenID.Phone != phone {
+		return authmodel.AuthResult{}, consts.ErrWechatPhoneConflict
+	}
+
+	user := byOpenID
+	if user == nil {
+		var byPhone *wechatUserRecord
+		err = dao.Users.Ctx(ctx).
+			Fields("id, phone, password_hash, status, role, user_type, wechat_openid").
+			Where(do.Users{Phone: phone}).
+			Scan(&byPhone)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return authmodel.AuthResult{}, gerror.Wrap(err, "query phone user")
+		}
+		if byPhone != nil && byPhone.WechatOpenID != "" && byPhone.WechatOpenID != openID {
+			return authmodel.AuthResult{}, consts.ErrWechatPhoneConflict
+		}
+		user = byPhone
+	}
+
+	if user == nil {
+		id, err := dao.Users.Ctx(ctx).Data(g.Map{
+			"phone":         phone,
+			"password_hash": "",
+			"wechat_openid": openID,
+			"status":        0,
+			"role":          0,
+			"user_type":     1,
+		}).InsertAndGetId()
+		if err != nil {
+			if isDuplicateKey(err) {
+				return authmodel.AuthResult{}, consts.ErrWechatPhoneConflict
+			}
+			return authmodel.AuthResult{}, gerror.Wrap(err, "create wechat user")
+		}
+		user = &wechatUserRecord{Id: uint64(id), Phone: phone, Status: 0, Role: 0, UserType: 1, WechatOpenID: openID}
+	} else if user.WechatOpenID == "" {
+		if _, err := dao.Users.Ctx(ctx).Data(g.Map{"wechat_openid": openID}).Where(do.Users{Id: user.Id}).Update(); err != nil {
+			if isDuplicateKey(err) {
+				return authmodel.AuthResult{}, consts.ErrWechatPhoneConflict
+			}
+			return authmodel.AuthResult{}, gerror.Wrap(err, "bind wechat user")
+		}
+		user.WechatOpenID = openID
+	}
+	if user.Status == 2 {
+		return authmodel.AuthResult{}, consts.ErrUserDisabled
+	}
+
+	result, err := authutil.IssueUserToken(ctx, authmodel.User{
+		ID: int64(user.Id), Phone: user.Phone, Role: uint8(user.Role),
+		UserType: uint8(user.UserType), Status: uint8(user.Status),
+	})
+	if err != nil {
+		return authmodel.AuthResult{}, err
+	}
+	if err := s.setUserSession(ctx, result.AccessToken, result.User); err != nil {
+		return authmodel.AuthResult{}, gerror.Wrap(err, "create user session")
+	}
+	return result, nil
+}
+
+type wechatUserRecord struct {
+	Id           uint64 `orm:"id"`
+	Phone        string `orm:"phone"`
+	PasswordHash string `orm:"password_hash"`
+	WechatOpenID string `orm:"wechat_openid"`
+	Status       uint   `orm:"status"`
+	Role         uint   `orm:"role"`
+	UserType     uint   `orm:"user_type"`
 }
 
 // Me returns the active user represented by a user access token and its Redis session.
@@ -192,6 +293,16 @@ func (s *sAuth) loadUserByID(ctx context.Context, id int64) (authmodel.User, err
 }
 
 func validateCredentials(phone, password string) error {
+	if err := validatePhone(phone); err != nil {
+		return err
+	}
+	if len(password) < 8 || len(password) > 72 {
+		return &consts.InvalidParameterError{Message: "password must contain 8 to 72 characters"}
+	}
+	return nil
+}
+
+func validatePhone(phone string) error {
 	if len(phone) < 6 || len(phone) > 20 {
 		return &consts.InvalidParameterError{Message: "phone must contain 6 to 20 digits"}
 	}
@@ -199,9 +310,6 @@ func validateCredentials(phone, password string) error {
 		if r < '0' || r > '9' {
 			return &consts.InvalidParameterError{Message: "phone must contain digits only"}
 		}
-	}
-	if len(password) < 8 || len(password) > 72 {
-		return &consts.InvalidParameterError{Message: "password must contain 8 to 72 characters"}
 	}
 	return nil
 }

@@ -10,7 +10,7 @@ import (
 func (c *ControllerV1) Login(ctx context.Context, req *v1.LoginReq) (res *v1.LoginRes, err error) {
 	result, err := service.Auth().Login(ctx, req.Phone, req.Password)
 	if err != nil {
-		return nil, toAPIError(err)
+		return nil, toAPIError(ctx, err)
 	}
 	return &v1.LoginRes{AuthData: toAPIData(result)}, nil
 }

@@ -10,6 +10,7 @@ import (
 
 // CompanyProfiles is the golang structure for table company_profiles.
 type CompanyProfiles struct {
+	Id               uint64    `json:"id"               orm:"id"                description:""` //
 	UserId           uint64    `json:"userId"           orm:"user_id"           description:""` //
 	IntroductionHtml string    `json:"introductionHtml" orm:"introduction_html" description:""` //
 	Offices          string    `json:"offices"          orm:"offices"           description:""` //

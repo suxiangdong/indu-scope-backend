@@ -48,7 +48,8 @@ func toAPIBinding(item attributeModel.CategoryAttributeItem) v1.CategoryAttribut
 		AttributeID: int64(item.AttributeID), AttributeCode: item.AttributeCode,
 		AttributeName: item.AttributeName, IsRequired: item.IsRequired,
 		GroupID: groupID, GroupCode: item.GroupCode, GroupName: item.GroupName,
-		IsFilterable: item.IsFilterable, IsSearchable: item.IsSearchable,
+		GroupDisplayName: item.GroupDisplayName,
+		IsFilterable:     item.IsFilterable, IsSearchable: item.IsSearchable,
 		SortOrder: item.SortOrder,
 		CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
@@ -57,7 +58,7 @@ func toAPIBinding(item attributeModel.CategoryAttributeItem) v1.CategoryAttribut
 func toAPIGroup(item attributeModel.AttributeGroupItem) v1.AttributeGroupInfo {
 	return v1.AttributeGroupInfo{
 		ID: int64(item.ID), Code: item.Code,
-		Name: item.Name, SortOrder: item.SortOrder, Status: item.Status,
+		Name: item.Name, DisplayName: item.DisplayName, SortOrder: item.SortOrder, Status: item.Status,
 		AttributeCount: item.AttributeCount, CategoryCount: item.CategoryCount,
 		CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
@@ -75,7 +76,8 @@ func toAPICategoryGroup(item attributeModel.CategoryGroupBindingItem) v1.Categor
 	return v1.CategoryGroupInfo{
 		CategoryID: int64(item.CategoryID), CategoryName: item.CategoryName,
 		GroupID: int64(item.GroupID), GroupCode: item.GroupCode, GroupName: item.GroupName,
-		SortOrder: item.SortOrder, Status: item.Status, AttributeCount: item.AttributeCount,
+		GroupDisplayName: item.GroupDisplayName,
+		SortOrder:        item.SortOrder, Status: item.Status, AttributeCount: item.AttributeCount,
 		CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
 }

@@ -15,6 +15,7 @@ type CategoryAttributeGroupBindingsDao struct {
 }
 
 type CategoryAttributeGroupBindingsColumns struct {
+	Id         string
 	CategoryId string
 	GroupId    string
 	SortOrder  string
@@ -24,6 +25,7 @@ type CategoryAttributeGroupBindingsColumns struct {
 }
 
 var categoryAttributeGroupBindingsColumns = CategoryAttributeGroupBindingsColumns{
+	Id:         "id",
 	CategoryId: "category_id", GroupId: "group_id", SortOrder: "sort_order", Status: "status",
 	CreatedAt: "created_at", UpdatedAt: "updated_at",
 }

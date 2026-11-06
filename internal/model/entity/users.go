@@ -12,6 +12,7 @@ import (
 type Users struct {
 	Id           uint64    `json:"id"           orm:"id"            description:""` //
 	Phone        string    `json:"phone"        orm:"phone"         description:""` //
+	WechatOpenID string    `json:"wechatOpenID" orm:"wechat_openid" description:""` //
 	PasswordHash string    `json:"passwordHash" orm:"password_hash" description:""` //
 	Status       uint      `json:"status"       orm:"status"        description:""` //
 	Role         uint      `json:"role"         orm:"role"          description:""` //

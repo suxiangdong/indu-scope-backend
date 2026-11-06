@@ -20,6 +20,22 @@ database:
 jwt:
   secret: "请替换为至少32个字符的随机字符串"
 
+wechat:
+  app_id: "微信小程序 AppID"
+  app_secret: "微信小程序 AppSecret"
+  api_base_url: "https://api.weixin.qq.com"
+
+oss:
+  # Use environment variables OSS_ENDPOINT, OSS_BUCKET, OSS_ACCESS_KEY_ID,
+  # and OSS_ACCESS_KEY_SECRET in production. These values are never sent to
+  # the mini-program.
+  endpoint: "https://oss-cn-beijing.aliyuncs.com"
+  # Development: env-develop. Production: env-production.
+  bucket: "env-develop"
+  access_key_id: ""
+  access_key_secret: ""
+  key_prefix: "indu/verification"
+
 redis:
   default:
     address: "redis主机:6379"

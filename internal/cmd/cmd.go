@@ -17,10 +17,15 @@ import (
 	adminAttributesController "github.com/suxiangdong/indu-scope-backend/internal/controller/adminattributes"
 	adminAuthController "github.com/suxiangdong/indu-scope-backend/internal/controller/adminauth"
 	adminCategoriesController "github.com/suxiangdong/indu-scope-backend/internal/controller/admincategories"
+	adminCustomerUsersController "github.com/suxiangdong/indu-scope-backend/internal/controller/admincustomerusers"
+	adminStorePlatformController "github.com/suxiangdong/indu-scope-backend/internal/controller/adminstoreplatform"
 	adminUsersController "github.com/suxiangdong/indu-scope-backend/internal/controller/adminusers"
+	adminVerificationController "github.com/suxiangdong/indu-scope-backend/internal/controller/adminverification"
 	"github.com/suxiangdong/indu-scope-backend/internal/controller/auth"
+	supplierProductsController "github.com/suxiangdong/indu-scope-backend/internal/controller/supplierproducts"
 	"github.com/suxiangdong/indu-scope-backend/internal/middleware"
 	"github.com/suxiangdong/indu-scope-backend/internal/sessionstore"
+	"github.com/suxiangdong/indu-scope-backend/internal/wechat"
 )
 
 var (
@@ -45,6 +50,11 @@ var (
 				_ = db.Close(context.Background())
 				return gerror.Wrap(err, "ping redis")
 			}
+			if err := wechat.WarmupAccessToken(ctx); err != nil {
+				// Keep the API available when WeChat is temporarily unreachable;
+				// getAccessToken will retry lazily when a phone login is requested.
+				g.Log().Warningf(ctx, "wechat access token warmup failed: %v", err)
+			}
 			closeResources := func() error {
 				var closeErr error
 				if err := redis.Close(context.Background()); err != nil {
@@ -63,6 +73,7 @@ var (
 			s.Group("/", func(group *ghttp.RouterGroup) {
 				group.Middleware(ghttp.MiddlewareHandlerResponse, middleware.Ctx)
 				group.Bind(auth.NewV1())
+				group.Bind(supplierProductsController.NewV1())
 			})
 			s.Group("/", func(group *ghttp.RouterGroup) {
 				group.Middleware(ghttp.MiddlewareHandlerResponse, middleware.AdminCtx)
@@ -71,8 +82,11 @@ var (
 			s.Group("/", func(group *ghttp.RouterGroup) {
 				group.Middleware(ghttp.MiddlewareHandlerResponse, middleware.AdminCtx, middleware.RequireAdmin)
 				group.Bind(adminUsersController.NewV1())
+				group.Bind(adminCustomerUsersController.NewV1())
+				group.Bind(adminVerificationController.NewV1())
 				group.Bind(adminCategoriesController.NewV1())
 				group.Bind(adminAttributesController.NewV1())
+				group.Bind(adminStorePlatformController.NewV1())
 			})
 
 			shutdownCtx, stopSignal := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)

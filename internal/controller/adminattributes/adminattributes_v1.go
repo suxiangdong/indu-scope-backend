@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/suxiangdong/indu-scope-backend/api/adminattributes/v1"
+	"github.com/suxiangdong/indu-scope-backend/internal/consts"
 	"github.com/suxiangdong/indu-scope-backend/internal/model/attribute"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 )
@@ -22,7 +23,7 @@ func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (*v1.ListRes, 
 
 func (c *ControllerV1) Create(ctx context.Context, req *v1.CreateReq) (*v1.CreateRes, error) {
 	item, err := service.AdminAttributes().Create(ctx, attribute.AttributeInput{
-		Code: req.Code, Name: req.Name, ValueType: req.ValueType, InputType: req.InputType,
+		Name: req.Name, ValueType: req.ValueType, InputType: req.InputType,
 		Unit: req.Unit, Placeholder: req.Placeholder, ValidationRules: req.ValidationRules,
 		HelpText: req.HelpText, Status: statusValue(req.Status), GroupIDs: req.GroupIDs,
 	})
@@ -34,7 +35,7 @@ func (c *ControllerV1) Create(ctx context.Context, req *v1.CreateReq) (*v1.Creat
 
 func (c *ControllerV1) Update(ctx context.Context, req *v1.UpdateReq) (*v1.UpdateRes, error) {
 	item, err := service.AdminAttributes().Update(ctx, req.ID, attribute.AttributeInput{
-		Code: req.Code, Name: req.Name, ValueType: req.ValueType, InputType: req.InputType,
+		Name: req.Name, ValueType: req.ValueType, InputType: req.InputType,
 		Unit: req.Unit, Placeholder: req.Placeholder, ValidationRules: req.ValidationRules,
 		HelpText: req.HelpText, Status: statusValue(req.Status), GroupIDs: req.GroupIDs,
 	})
@@ -65,7 +66,7 @@ func (c *ControllerV1) ListOptions(ctx context.Context, req *v1.ListOptionsReq) 
 
 func (c *ControllerV1) CreateOption(ctx context.Context, req *v1.CreateOptionReq) (*v1.CreateOptionRes, error) {
 	item, err := service.AdminAttributes().CreateOption(ctx, req.AttributeID, attribute.AttributeOptionInput{
-		Code: req.Code, Name: req.Name, SortOrder: req.SortOrder, Status: statusValue(req.Status),
+		Name: req.Name, SortOrder: req.SortOrder, Status: statusValue(req.Status),
 	})
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -75,7 +76,7 @@ func (c *ControllerV1) CreateOption(ctx context.Context, req *v1.CreateOptionReq
 
 func (c *ControllerV1) UpdateOption(ctx context.Context, req *v1.UpdateOptionReq) (*v1.UpdateOptionRes, error) {
 	item, err := service.AdminAttributes().UpdateOption(ctx, req.ID, attribute.AttributeOptionInput{
-		Code: req.Code, Name: req.Name, SortOrder: req.SortOrder, Status: statusValue(req.Status),
+		Name: req.Name, SortOrder: req.SortOrder, Status: statusValue(req.Status),
 	})
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -136,7 +137,7 @@ func (c *ControllerV1) ListGroups(ctx context.Context, req *v1.ListGroupsReq) (*
 
 func (c *ControllerV1) CreateGroup(ctx context.Context, req *v1.CreateGroupReq) (*v1.CreateGroupRes, error) {
 	item, err := service.AdminAttributes().CreateGroup(ctx, attribute.AttributeGroupInput{
-		Code: req.Code, Name: req.Name,
+		Name: req.Name, DisplayName: req.DisplayName,
 		SortOrder: req.SortOrder, Status: statusValue(req.Status),
 	})
 	if err != nil {
@@ -147,7 +148,7 @@ func (c *ControllerV1) CreateGroup(ctx context.Context, req *v1.CreateGroupReq) 
 
 func (c *ControllerV1) UpdateGroup(ctx context.Context, req *v1.UpdateGroupReq) (*v1.UpdateGroupRes, error) {
 	item, err := service.AdminAttributes().UpdateGroup(ctx, req.ID, attribute.AttributeGroupInput{
-		Code: req.Code, Name: req.Name,
+		Name: req.Name, DisplayName: req.DisplayName,
 		SortOrder: req.SortOrder, Status: statusValue(req.Status),
 	})
 	if err != nil {
@@ -193,7 +194,18 @@ func (c *ControllerV1) DeleteGroupAttribute(ctx context.Context, req *v1.DeleteG
 }
 
 func (c *ControllerV1) ListCategoryGroups(ctx context.Context, req *v1.ListCategoryGroupsReq) (*v1.ListCategoryGroupsRes, error) {
-	result, err := service.AdminAttributes().ListCategoryGroups(ctx, req.CategoryID)
+	if req.CategoryID == 0 && req.GroupID == 0 {
+		return nil, toAPIError(ctx, &consts.InvalidParameterError{Message: "category_id or group_id is required"})
+	}
+	var (
+		result attribute.CategoryGroupBindingListResult
+		err    error
+	)
+	if req.GroupID != 0 {
+		result, err = service.AdminAttributes().ListGroupCategories(ctx, req.GroupID)
+	} else {
+		result, err = service.AdminAttributes().ListCategoryGroups(ctx, req.CategoryID)
+	}
 	if err != nil {
 		return nil, toAPIError(ctx, err)
 	}

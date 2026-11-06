@@ -2,12 +2,13 @@ package adminattributes
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base32"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
-	"unicode"
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
@@ -80,7 +81,11 @@ func (s *sAdminAttributes) Create(ctx context.Context, input attributeModel.Attr
 	if err := s.validateGroupIDs(ctx, input.GroupIDs); err != nil {
 		return attributeModel.AttributeItem{}, err
 	}
-	id, err := dao.Attributes.Ctx(ctx).Data(attributeData(input)).InsertAndGetId()
+	code, err := generateCode("attr")
+	if err != nil {
+		return attributeModel.AttributeItem{}, gerror.Wrap(err, "generate attribute code")
+	}
+	id, err := dao.Attributes.Ctx(ctx).Data(attributeData(input, code)).InsertAndGetId()
 	if err != nil {
 		if isDuplicateKey(err) {
 			return attributeModel.AttributeItem{}, consts.ErrAttributeAlreadyExists
@@ -113,7 +118,7 @@ func (s *sAdminAttributes) Update(ctx context.Context, id uint64, input attribut
 	} else if count == 0 {
 		return attributeModel.AttributeItem{}, consts.ErrAttributeNotFound
 	}
-	if _, err := dao.Attributes.Ctx(ctx).Where(do.Attributes{Id: id}).Data(attributeData(input)).Update(); err != nil {
+	if _, err := dao.Attributes.Ctx(ctx).Where(do.Attributes{Id: id}).Data(attributeData(input, "")).Update(); err != nil {
 		if isDuplicateKey(err) {
 			return attributeModel.AttributeItem{}, consts.ErrAttributeAlreadyExists
 		}
@@ -193,9 +198,13 @@ func (s *sAdminAttributes) CreateOption(ctx context.Context, attributeID uint64,
 	if err := validateOptionInput(input); err != nil {
 		return attributeModel.AttributeOptionItem{}, err
 	}
+	code, err := generateCode("opt")
+	if err != nil {
+		return attributeModel.AttributeOptionItem{}, gerror.Wrap(err, "generate attribute option code")
+	}
 	id, err := dao.AttributeOptions.Ctx(ctx).Data(g.Map{
 		"attribute_id": attributeID,
-		"code":         input.Code,
+		"code":         code,
 		"name":         input.Name,
 		"sort_order":   input.SortOrder,
 		"status":       input.Status,
@@ -217,20 +226,12 @@ func (s *sAdminAttributes) UpdateOption(ctx context.Context, id uint64, input at
 	if err := validateOptionInput(input); err != nil {
 		return attributeModel.AttributeOptionItem{}, err
 	}
-	record, err := s.loadOptionEntity(ctx, id)
+	_, err := s.loadOptionEntity(ctx, id)
 	if err != nil {
 		return attributeModel.AttributeOptionItem{}, err
 	}
-	optionCols := dao.AttributeOptions.Columns()
-	if count, err := dao.AttributeOptions.Ctx(ctx).
-		Where(do.AttributeOptions{AttributeId: record.AttributeId, Code: input.Code}).
-		Wheref("%s <> ?", optionCols.Id, id).Count(); err != nil {
-		return attributeModel.AttributeOptionItem{}, gerror.Wrap(err, "check attribute option code")
-	} else if count > 0 {
-		return attributeModel.AttributeOptionItem{}, consts.ErrAttributeOptionExists
-	}
 	if _, err := dao.AttributeOptions.Ctx(ctx).Where(do.AttributeOptions{Id: id}).Data(g.Map{
-		"code": input.Code, "name": input.Name,
+		"name":       input.Name,
 		"sort_order": input.SortOrder, "status": input.Status,
 	}).Update(); err != nil {
 		if isDuplicateKey(err) {
@@ -456,7 +457,7 @@ func (s *sAdminAttributes) buildCategoryAttributeItem(ctx context.Context, categ
 	item := attributeModel.CategoryAttributeItem{
 		CategoryID: category.Id, CategoryName: category.Name,
 		AttributeID: attribute.Id, AttributeCode: attribute.Code, AttributeName: attribute.Name,
-		GroupID: &groupID, GroupCode: group.Code, GroupName: group.Name,
+		GroupID: &groupID, GroupCode: group.Code, GroupName: group.Name, GroupDisplayName: group.DisplayName,
 		IsRequired: 0, IsFilterable: 0, IsSearchable: 0,
 		SortOrder: member.SortOrder, CreatedAt: member.CreatedAt, UpdatedAt: member.UpdatedAt,
 	}
@@ -603,7 +604,11 @@ func (s *sAdminAttributes) CreateGroup(ctx context.Context, input attributeModel
 	if err := validateGroupInput(input); err != nil {
 		return attributeModel.AttributeGroupItem{}, err
 	}
-	id, err := dao.AttributeGroups.Ctx(ctx).Data(groupData(input)).InsertAndGetId()
+	code, err := generateCode("group")
+	if err != nil {
+		return attributeModel.AttributeGroupItem{}, gerror.Wrap(err, "generate attribute group code")
+	}
+	id, err := dao.AttributeGroups.Ctx(ctx).Data(groupData(input, code)).InsertAndGetId()
 	if err != nil {
 		if isDuplicateKey(err) {
 			return attributeModel.AttributeGroupItem{}, consts.ErrAttributeGroupExists
@@ -625,17 +630,12 @@ func (s *sAdminAttributes) UpdateGroup(ctx context.Context, id uint64, input att
 		return attributeModel.AttributeGroupItem{}, err
 	}
 	cols := dao.AttributeGroups.Columns()
-	if count, err := dao.AttributeGroups.Ctx(ctx).Where(do.AttributeGroups{Code: input.Code}).Wheref("%s <> ?", cols.Id, id).Count(); err != nil {
-		return attributeModel.AttributeGroupItem{}, gerror.Wrap(err, "check attribute group code")
-	} else if count > 0 {
-		return attributeModel.AttributeGroupItem{}, consts.ErrAttributeGroupExists
-	}
 	if count, err := dao.AttributeGroups.Ctx(ctx).Where(do.AttributeGroups{Name: input.Name}).Wheref("%s <> ?", cols.Id, id).Count(); err != nil {
 		return attributeModel.AttributeGroupItem{}, gerror.Wrap(err, "check attribute group name")
 	} else if count > 0 {
 		return attributeModel.AttributeGroupItem{}, consts.ErrAttributeGroupExists
 	}
-	if _, err := dao.AttributeGroups.Ctx(ctx).Where(do.AttributeGroups{Id: id}).Data(groupData(input)).Update(); err != nil {
+	if _, err := dao.AttributeGroups.Ctx(ctx).Where(do.AttributeGroups{Id: id}).Data(groupData(input, "")).Update(); err != nil {
 		if isDuplicateKey(err) {
 			return attributeModel.AttributeGroupItem{}, consts.ErrAttributeGroupExists
 		}
@@ -789,7 +789,40 @@ func (s *sAdminAttributes) ListCategoryGroups(ctx context.Context, categoryID ui
 		}
 		items = append(items, attributeModel.CategoryGroupBindingItem{
 			CategoryID: category.Id, CategoryName: category.Name, GroupID: group.ID, GroupCode: group.Code,
-			GroupName: group.Name, SortOrder: record.SortOrder, Status: uint8(record.Status),
+			GroupName: group.Name, GroupDisplayName: group.DisplayName, SortOrder: record.SortOrder, Status: uint8(record.Status),
+			AttributeCount: group.AttributeCount, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
+		})
+	}
+	return attributeModel.CategoryGroupBindingListResult{Items: items}, nil
+}
+
+func (s *sAdminAttributes) ListGroupCategories(ctx context.Context, groupID uint64) (attributeModel.CategoryGroupBindingListResult, error) {
+	if err := s.ensureAttributeGroupExists(ctx, groupID); err != nil {
+		return attributeModel.CategoryGroupBindingListResult{}, err
+	}
+	cols := dao.CategoryAttributeGroupBindings.Columns()
+	var records []*entity.CategoryAttributeGroupBindings
+	if err := dao.CategoryAttributeGroupBindings.Ctx(ctx).Fields(
+		cols.CategoryId, cols.GroupId, cols.SortOrder, cols.Status, cols.CreatedAt, cols.UpdatedAt,
+	).Where(do.CategoryAttributeGroupBindings{GroupId: groupID}).OrderAsc(cols.SortOrder).OrderAsc(cols.CategoryId).Scan(&records); err != nil {
+		return attributeModel.CategoryGroupBindingListResult{}, gerror.Wrap(err, "list group categories")
+	}
+	group, err := s.loadAttributeGroup(ctx, groupID)
+	if err != nil {
+		return attributeModel.CategoryGroupBindingListResult{}, err
+	}
+	items := make([]attributeModel.CategoryGroupBindingItem, 0, len(records))
+	for _, record := range records {
+		if record == nil {
+			continue
+		}
+		category, err := s.loadCategoryEntity(ctx, record.CategoryId)
+		if err != nil {
+			return attributeModel.CategoryGroupBindingListResult{}, err
+		}
+		items = append(items, attributeModel.CategoryGroupBindingItem{
+			CategoryID: category.Id, CategoryName: category.Name, GroupID: group.ID, GroupCode: group.Code,
+			GroupName: group.Name, GroupDisplayName: group.DisplayName, SortOrder: record.SortOrder, Status: uint8(record.Status),
 			AttributeCount: group.AttributeCount, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 		})
 	}
@@ -958,7 +991,7 @@ func (s *sAdminAttributes) loadAttributeGroup(ctx context.Context, id uint64) (a
 		return attributeModel.AttributeGroupItem{}, gerror.Wrap(err, "count category group bindings")
 	}
 	return attributeModel.AttributeGroupItem{
-		ID: group.Id, Code: group.Code, Name: group.Name, SortOrder: group.SortOrder,
+		ID: group.Id, Code: group.Code, Name: group.Name, DisplayName: group.DisplayName, SortOrder: group.SortOrder,
 		Status: uint8(group.Status), AttributeCount: uint(attributeCount), CategoryCount: uint(categoryCount),
 		CreatedAt: group.CreatedAt, UpdatedAt: group.UpdatedAt,
 	}, nil
@@ -968,7 +1001,7 @@ func (s *sAdminAttributes) loadAttributeGroupEntity(ctx context.Context, id uint
 	cols := dao.AttributeGroups.Columns()
 	var group *entity.AttributeGroups
 	if err := dao.AttributeGroups.Ctx(ctx).Fields(
-		cols.Id, cols.Code, cols.Name, cols.SortOrder, cols.Status, cols.CreatedAt, cols.UpdatedAt,
+		cols.Id, cols.Code, cols.Name, cols.DisplayName, cols.SortOrder, cols.Status, cols.CreatedAt, cols.UpdatedAt,
 	).Where(do.AttributeGroups{Id: id}).Scan(&group); err != nil {
 		return nil, gerror.Wrap(err, "query attribute group")
 	}
@@ -989,7 +1022,6 @@ func (s *sAdminAttributes) ensureAttributeGroupExists(ctx context.Context, id ui
 }
 
 func normalizeAttributeInput(input attributeModel.AttributeInput) attributeModel.AttributeInput {
-	input.Code = strings.TrimSpace(input.Code)
 	input.Name = strings.TrimSpace(input.Name)
 	input.InputType = strings.TrimSpace(input.InputType)
 	input.Unit = strings.TrimSpace(input.Unit)
@@ -1000,21 +1032,17 @@ func normalizeAttributeInput(input attributeModel.AttributeInput) attributeModel
 }
 
 func normalizeOptionInput(input attributeModel.AttributeOptionInput) attributeModel.AttributeOptionInput {
-	input.Code = strings.TrimSpace(input.Code)
 	input.Name = strings.TrimSpace(input.Name)
 	return input
 }
 
 func normalizeGroupInput(input attributeModel.AttributeGroupInput) attributeModel.AttributeGroupInput {
-	input.Code = strings.TrimSpace(input.Code)
 	input.Name = strings.TrimSpace(input.Name)
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	return input
 }
 
 func validateAttributeInput(input attributeModel.AttributeInput) error {
-	if invalidCode(input.Code, 64) {
-		return &consts.InvalidParameterError{Message: "code must contain 1 to 64 non-whitespace characters"}
-	}
 	if input.Name == "" || len(input.Name) > 100 {
 		return &consts.InvalidParameterError{Message: "name must contain 1 to 100 characters"}
 	}
@@ -1034,9 +1062,6 @@ func validateAttributeInput(input attributeModel.AttributeInput) error {
 }
 
 func validateOptionInput(input attributeModel.AttributeOptionInput) error {
-	if invalidCode(input.Code, 64) {
-		return &consts.InvalidParameterError{Message: "code must contain 1 to 64 non-whitespace characters"}
-	}
 	if input.Name == "" || len(input.Name) > 100 {
 		return &consts.InvalidParameterError{Message: "name must contain 1 to 100 characters"}
 	}
@@ -1044,11 +1069,11 @@ func validateOptionInput(input attributeModel.AttributeOptionInput) error {
 }
 
 func validateGroupInput(input attributeModel.AttributeGroupInput) error {
-	if invalidCode(input.Code, 64) {
-		return &consts.InvalidParameterError{Message: "code must contain 1 to 64 non-whitespace characters"}
-	}
 	if input.Name == "" || len(input.Name) > 100 {
 		return &consts.InvalidParameterError{Message: "name must contain 1 to 100 characters"}
+	}
+	if input.DisplayName == "" || len(input.DisplayName) > 100 {
+		return &consts.InvalidParameterError{Message: "display_name must contain 1 to 100 characters"}
 	}
 	return validateFlag(input.Status, "status")
 }
@@ -1060,28 +1085,38 @@ func validateFlag(value uint, field string) error {
 	return nil
 }
 
-func invalidCode(value string, max int) bool {
-	if value == "" || len(value) > max {
-		return true
-	}
-	return strings.IndexFunc(value, unicode.IsSpace) >= 0
-}
-
-func attributeData(input attributeModel.AttributeInput) g.Map {
-	return g.Map{
-		"code": input.Code, "name": input.Name, "value_type": input.ValueType,
+func attributeData(input attributeModel.AttributeInput, code string) g.Map {
+	data := g.Map{
+		"name": input.Name, "value_type": input.ValueType,
 		"input_type": input.InputType, "unit": nullableString(input.Unit),
 		"placeholder":      nullableString(input.Placeholder),
 		"validation_rules": nullableString(input.ValidationRules),
 		"help_text":        nullableString(input.HelpText), "status": input.Status,
 	}
+	if code != "" {
+		data["code"] = code
+	}
+	return data
 }
 
-func groupData(input attributeModel.AttributeGroupInput) g.Map {
-	return g.Map{
-		"code": input.Code, "name": input.Name,
+func groupData(input attributeModel.AttributeGroupInput, code string) g.Map {
+	data := g.Map{
+		"name": input.Name, "display_name": input.DisplayName,
 		"sort_order": input.SortOrder, "status": input.Status,
 	}
+	if code != "" {
+		data["code"] = code
+	}
+	return data
+}
+
+func generateCode(prefix string) (string, error) {
+	bytes := make([]byte, 8)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	encoded := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(bytes)
+	return prefix + "_" + strings.ToLower(encoded), nil
 }
 
 func nullableString(value string) any {

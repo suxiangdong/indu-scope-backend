@@ -21,24 +21,48 @@ type PersonalVerificationsDao struct {
 
 // PersonalVerificationsColumns defines and stores column names for the table personal_verifications.
 type PersonalVerificationsColumns struct {
+	Id                string //
 	UserId            string //
 	RealName          string //
+	IdNumber          string //
 	IdNumberEncrypted string //
-	IdFrontFileId     string //
-	IdBackFileId      string //
+	StorePlatformId   string //
+	StoreUrl          string //
+	IdFrontBucket     string //
+	IdFrontEndpoint   string //
+	IdFrontPath       string //
+	IdBackBucket      string //
+	IdBackEndpoint    string //
+	IdBackPath        string //
 	VerifiedAt        string //
+	ReviewStatus      string //
+	ReviewReason      string //
+	ReviewedBy        string //
+	ReviewedAt        string //
 	CreatedAt         string //
 	UpdatedAt         string //
 }
 
 // personalVerificationsColumns holds the columns for the table personal_verifications.
 var personalVerificationsColumns = PersonalVerificationsColumns{
+	Id:                "id",
 	UserId:            "user_id",
 	RealName:          "real_name",
+	IdNumber:          "id_number",
 	IdNumberEncrypted: "id_number_encrypted",
-	IdFrontFileId:     "id_front_file_id",
-	IdBackFileId:      "id_back_file_id",
+	StorePlatformId:   "store_platform_id",
+	StoreUrl:          "store_url",
+	IdFrontBucket:     "id_front_bucket",
+	IdFrontEndpoint:   "id_front_endpoint",
+	IdFrontPath:       "id_front_path",
+	IdBackBucket:      "id_back_bucket",
+	IdBackEndpoint:    "id_back_endpoint",
+	IdBackPath:        "id_back_path",
 	VerifiedAt:        "verified_at",
+	ReviewStatus:      "review_status",
+	ReviewReason:      "review_reason",
+	ReviewedBy:        "reviewed_by",
+	ReviewedAt:        "reviewed_at",
 	CreatedAt:         "created_at",
 	UpdatedAt:         "updated_at",
 }

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d31c70f9-02d7-4da0-91f5-fc3f0fba1cc7",
     "name": "Indu Scope - Auth API",
-    "description": "手机号注册、密码登录及基于 Redis session 的当前用户和退出登录接口。注册后用户 status=0，完成实名认证后由后台更新为 status=1。",
+    "description": "手机号注册、密码登录及基于 Redis session 的当前用户和退出登录接口。新用户 role=0，完成完善资料后再确定业务角色；认证通过后由后台更新 status=1。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -40,7 +40,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"password\": \"{{password}}\",\n  \"role\": 1,\n  \"user_type\": 1\n}",
+          "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"password\": \"{{password}}\",\n  \"user_type\": 1\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -59,7 +59,7 @@
             "register"
           ]
         },
-        "description": "手机号注册。role: 1=采购方，2=供货方；user_type: 1=个人用户，2=公司用户。"
+        "description": "手机号注册。role: 0=待完善，1=采购方，2=供货方；user_type: 1=个人用户，2=公司用户。微信手机号登录的新用户会自动使用 role=0，后续在完善资料时选择角色。"
       },
       "event": [
         {

@@ -26,6 +26,7 @@ type IAdminAttributes interface {
 	SaveGroupAttribute(ctx context.Context, input attributeModel.AttributeGroupAttributeInput) (attributeModel.AttributeGroupAttributeItem, error)
 	DeleteGroupAttribute(ctx context.Context, groupID, attributeID uint64) error
 	ListCategoryGroups(ctx context.Context, categoryID uint64) (attributeModel.CategoryGroupBindingListResult, error)
+	ListGroupCategories(ctx context.Context, groupID uint64) (attributeModel.CategoryGroupBindingListResult, error)
 	BindCategoryGroup(ctx context.Context, input attributeModel.CategoryGroupBindingInput) (attributeModel.CategoryGroupBindingItem, error)
 	UnbindCategoryGroup(ctx context.Context, categoryID, groupID uint64) error
 }

@@ -21,24 +21,38 @@ type CompanyVerificationsDao struct {
 
 // CompanyVerificationsColumns defines and stores column names for the table company_verifications.
 type CompanyVerificationsColumns struct {
+	Id                      string //
 	UserId                  string //
 	CompanyName             string //
 	UnifiedSocialCreditCode string //
-	BusinessLicenseFileId   string //
+	BusinessLicenseBucket   string //
+	BusinessLicenseEndpoint string //
+	BusinessLicensePath     string //
 	RegisteredAddress       string //
 	VerifiedAt              string //
+	ReviewStatus            string //
+	ReviewReason            string //
+	ReviewedBy              string //
+	ReviewedAt              string //
 	CreatedAt               string //
 	UpdatedAt               string //
 }
 
 // companyVerificationsColumns holds the columns for the table company_verifications.
 var companyVerificationsColumns = CompanyVerificationsColumns{
+	Id:                      "id",
 	UserId:                  "user_id",
 	CompanyName:             "company_name",
 	UnifiedSocialCreditCode: "unified_social_credit_code",
-	BusinessLicenseFileId:   "business_license_file_id",
+	BusinessLicenseBucket:   "business_license_bucket",
+	BusinessLicenseEndpoint: "business_license_endpoint",
+	BusinessLicensePath:     "business_license_path",
 	RegisteredAddress:       "registered_address",
 	VerifiedAt:              "verified_at",
+	ReviewStatus:            "review_status",
+	ReviewReason:            "review_reason",
+	ReviewedBy:              "reviewed_by",
+	ReviewedAt:              "reviewed_at",
 	CreatedAt:               "created_at",
 	UpdatedAt:               "updated_at",
 }

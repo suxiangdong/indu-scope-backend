@@ -17,7 +17,7 @@ func (c *ControllerV1) Me(ctx context.Context, _ *v1.MeReq) (res *v1.MeRes, err 
 	}
 	user, err := service.Auth().Me(ctx, token)
 	if err != nil {
-		return nil, toAPIError(err)
+		return nil, toAPIError(ctx, err)
 	}
 	return &v1.MeRes{UserInfo: toUserInfo(user)}, nil
 }

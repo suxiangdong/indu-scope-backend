@@ -13,7 +13,7 @@ func (c *ControllerV1) Logout(ctx context.Context, _ *v1.LogoutReq) (res *v1.Log
 		return nil, err
 	}
 	if err := service.Auth().Logout(ctx, token); err != nil {
-		return nil, toAPIError(err)
+		return nil, toAPIError(ctx, err)
 	}
 	return &v1.LogoutRes{}, nil
 }

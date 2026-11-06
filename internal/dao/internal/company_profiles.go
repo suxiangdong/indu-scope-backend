@@ -21,6 +21,7 @@ type CompanyProfilesDao struct {
 
 // CompanyProfilesColumns defines and stores column names for the table company_profiles.
 type CompanyProfilesColumns struct {
+	Id               string //
 	UserId           string //
 	IntroductionHtml string //
 	Offices          string //
@@ -31,6 +32,7 @@ type CompanyProfilesColumns struct {
 
 // companyProfilesColumns holds the columns for the table company_profiles.
 var companyProfilesColumns = CompanyProfilesColumns{
+	Id:               "id",
 	UserId:           "user_id",
 	IntroductionHtml: "introduction_html",
 	Offices:          "offices",

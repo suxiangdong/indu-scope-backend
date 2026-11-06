@@ -8,7 +8,7 @@ import (
 
 func TestValidateAttributeInput(t *testing.T) {
 	valid := attributeModel.AttributeInput{
-		Code: "voltage", Name: "额定电压", ValueType: 3, InputType: "number", Status: 1,
+		Name: "额定电压", ValueType: 3, InputType: "number", Status: 1,
 		ValidationRules: `{"min":0,"max":1000}`,
 	}
 	if err := validateAttributeInput(valid); err != nil {
@@ -28,10 +28,24 @@ func TestValidateAttributeInput(t *testing.T) {
 	}
 }
 
-func TestValidateOptionInputRejectsWhitespaceCode(t *testing.T) {
+func TestValidateOptionInput(t *testing.T) {
 	if err := validateOptionInput(attributeModel.AttributeOptionInput{
-		Code: "high voltage", Name: "高压", Status: 1,
-	}); err == nil {
-		t.Fatal("option code containing whitespace was accepted")
+		Name: "高压", Status: 1,
+	}); err != nil {
+		t.Fatalf("valid option rejected: %v", err)
+	}
+}
+
+func TestGenerateCode(t *testing.T) {
+	first, err := generateCode("attr")
+	if err != nil {
+		t.Fatalf("generate code: %v", err)
+	}
+	second, err := generateCode("attr")
+	if err != nil {
+		t.Fatalf("generate code: %v", err)
+	}
+	if first == second || len(first) > 20 || len(second) > 20 {
+		t.Fatalf("generated codes are not unique or too long: %q, %q", first, second)
 	}
 }

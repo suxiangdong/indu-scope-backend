@@ -12,3 +12,8 @@ data:
     logger:
       level : "all"
       stdout: true
+
+    oss:
+      endpoint: "https://oss-cn-beijing.aliyuncs.com"
+      bucket: "env-develop"
+      key_prefix: "indu/verification"

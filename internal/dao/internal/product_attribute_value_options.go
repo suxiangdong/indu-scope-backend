@@ -21,6 +21,7 @@ type ProductAttributeValueOptionsDao struct {
 
 // ProductAttributeValueOptionsColumns defines and stores column names for the table product_attribute_value_options.
 type ProductAttributeValueOptionsColumns struct {
+	Id        string //
 	ValueId   string //
 	OptionId  string //
 	CreatedAt string //
@@ -29,6 +30,7 @@ type ProductAttributeValueOptionsColumns struct {
 
 // productAttributeValueOptionsColumns holds the columns for the table product_attribute_value_options.
 var productAttributeValueOptionsColumns = ProductAttributeValueOptionsColumns{
+	Id:        "id",
 	ValueId:   "value_id",
 	OptionId:  "option_id",
 	CreatedAt: "created_at",
