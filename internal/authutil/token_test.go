@@ -28,7 +28,10 @@ func TestIssueUserToken(t *testing.T) {
 		t.Fatalf("parse token: %v", err)
 	}
 	claims := token.Claims.(*jwt.RegisteredClaims)
-	if !token.Valid || claims.Subject != "42" || claims.Issuer != consts.UserTokenIssuer || claims.ID == "" || claims.ExpiresAt != nil {
+	if !token.Valid || claims.Subject != "42" || claims.Issuer != consts.UserTokenIssuer || claims.ID == "" || claims.ExpiresAt == nil {
 		t.Fatalf("unexpected claims: %+v", token.Claims)
+	}
+	if claims.ExpiresAt.Time.Before(claims.IssuedAt.Time) {
+		t.Fatalf("token expiry precedes issue time: %+v", token.Claims)
 	}
 }

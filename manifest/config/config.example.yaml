@@ -3,6 +3,8 @@
 
 server:
   address: ":8000"
+  # Set false in production to disable both Swagger UI and /api.json.
+  swagger_enabled: true
   openapiPath: "/api.json"
   swaggerPath: "/swagger"
 
@@ -25,6 +27,21 @@ wechat:
   app_secret: "微信小程序 AppSecret"
   api_base_url: "https://api.weixin.qq.com"
 
+# Ordinary mini-program payment, using WeChat Pay PUBLIC KEY mode.
+# The app_id uses wechat.app_id above. Never use a different app's openid.
+# Each field also supports a WECHAT_PAY_<UPPERCASE_FIELD> environment variable.
+wechat_pay:
+  enabled: false
+  mch_id: "微信支付商户号"
+  merchant_serial_no: "商户证书序列号"
+  api_v3_key: ""
+  merchant_private_key_path: "/run/secrets/apiclient_key.pem"
+  public_key_id: "PUB_KEY_ID_替换为商户平台的公钥ID"
+  public_key_path: "/run/secrets/pub_key.pem"
+  notify_url: "https://你的域名/api/v1/payment/wechat/notify"
+  # Optional: defaults to the same domain/path prefix as notify_url.
+  refund_notify_url: "https://你的域名/api/v1/payment/wechat/refund/notify"
+
 oss:
   # Use environment variables OSS_ENDPOINT, OSS_BUCKET, OSS_ACCESS_KEY_ID,
   # and OSS_ACCESS_KEY_SECRET in production. These values are never sent to
@@ -35,6 +52,10 @@ oss:
   access_key_id: ""
   access_key_secret: ""
   key_prefix: "indu/verification"
+
+ocr:
+  # Optional; defaults to ocr-api.cn-hangzhou.aliyuncs.com.
+  endpoint: "ocr-api.cn-hangzhou.aliyuncs.com"
 
 redis:
   default:

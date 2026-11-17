@@ -8,6 +8,9 @@ import (
 )
 
 func (c *ControllerV1) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.UpdateRes, err error) {
+	if req == nil {
+		return nil, invalidRequest("category update request is required")
+	}
 	item, err := service.AdminCategories().Update(ctx, req.ID, normalizeParentID(req.ParentID), req.Name, req.SortOrder, statusValue(req.Status))
 	if err != nil {
 		return nil, toAPIError(ctx, err)

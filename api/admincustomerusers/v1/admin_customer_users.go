@@ -9,6 +9,7 @@ import (
 type CustomerUserInfo struct {
 	ID                 int64     `json:"id"`
 	Phone              string    `json:"phone"`
+	CompanyName        string    `json:"company_name"`
 	Role               uint8     `json:"role"`
 	UserType           uint8     `json:"user_type"`
 	Status             uint8     `json:"status"`
@@ -39,6 +40,17 @@ type UpdateStatusReq struct {
 }
 
 type UpdateStatusRes struct {
+	g.Meta `mime:"application/json"`
+	CustomerUserInfo
+}
+
+type UpdateRoleReq struct {
+	g.Meta `path:"/api/v1/admin/customer-users/role" tags:"AdminCustomerUsers" method:"post" summary:"Update frontend user role"`
+	ID     uint64 `json:"id" v:"required"`
+	Role   uint8  `json:"role" v:"required" dc:"1 buyer, 2 supplier"`
+}
+
+type UpdateRoleRes struct {
 	g.Meta `mime:"application/json"`
 	CustomerUserInfo
 }

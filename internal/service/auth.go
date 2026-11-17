@@ -21,6 +21,7 @@ type (
 		ListStorePlatforms(ctx context.Context) ([]storePlatformModel.Item, error)
 		GetVerification(ctx context.Context) (verificationModel.Summary, error)
 		UploadBusinessLicense(ctx context.Context, input verificationModel.BusinessLicenseUploadInput) (verificationModel.BusinessLicenseInfo, error)
+		RecognizeBusinessLicense(ctx context.Context) (verificationModel.BusinessLicenseOCR, error)
 		UploadIDCard(ctx context.Context, input verificationModel.IDCardUploadInput) (verificationModel.IDCardUploadInfo, error)
 		SubmitPersonalVerification(ctx context.Context, input verificationModel.PersonalInput) (verificationModel.Summary, error)
 		SubmitCompanyVerification(ctx context.Context, input verificationModel.CompanyInput) (verificationModel.Summary, error)

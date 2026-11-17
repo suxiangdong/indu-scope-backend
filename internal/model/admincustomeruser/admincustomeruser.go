@@ -12,6 +12,7 @@ type ListFilter struct {
 type UserItem struct {
 	ID                 int64
 	Phone              string
+	CompanyName        string
 	Role               uint8
 	UserType           uint8
 	Status             uint8

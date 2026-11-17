@@ -43,8 +43,28 @@ var CompanyProfiles = map[string]*gdb.TableField{
 		Extra:   "",
 		Comment: "",
 	},
-	"offices": {
+	"store_platform_id": {
 		Index:   3,
+		Name:    "store_platform_id",
+		Type:    "bigint unsigned",
+		Null:    true,
+		Key:     "MUL",
+		Default: nil,
+		Extra:   "",
+		Comment: "",
+	},
+	"store_url": {
+		Index:   4,
+		Name:    "store_url",
+		Type:    "varchar(500)",
+		Null:    true,
+		Key:     "",
+		Default: nil,
+		Extra:   "",
+		Comment: "",
+	},
+	"offices": {
+		Index:   5,
 		Name:    "offices",
 		Type:    "json",
 		Null:    false,
@@ -54,7 +74,7 @@ var CompanyProfiles = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"factories": {
-		Index:   4,
+		Index:   6,
 		Name:    "factories",
 		Type:    "json",
 		Null:    false,
@@ -64,7 +84,7 @@ var CompanyProfiles = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"created_at": {
-		Index:   5,
+		Index:   7,
 		Name:    "created_at",
 		Type:    "datetime(3)",
 		Null:    false,
@@ -74,7 +94,7 @@ var CompanyProfiles = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"updated_at": {
-		Index:   6,
+		Index:   8,
 		Name:    "updated_at",
 		Type:    "datetime(3)",
 		Null:    false,

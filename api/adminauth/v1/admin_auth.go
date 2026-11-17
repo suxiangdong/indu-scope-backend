@@ -9,11 +9,12 @@ type LoginReq struct {
 }
 
 type AdminUserInfo struct {
-	ID       int64  `json:"id" dc:"Admin user ID"`
-	Username string `json:"username" dc:"Admin username"`
-	Name     string `json:"name" dc:"Admin name"`
-	Phone    string `json:"phone" dc:"Phone number"`
-	Status   uint8  `json:"status" dc:"0 disabled, 1 active"`
+	ID           int64  `json:"id" dc:"Admin user ID"`
+	Username     string `json:"username" dc:"Admin username"`
+	Name         string `json:"name" dc:"Admin name"`
+	Phone        string `json:"phone" dc:"Phone number"`
+	Status       uint8  `json:"status" dc:"0 disabled, 1 active"`
+	IsSuperAdmin bool   `json:"is_super_admin" dc:"Whether this administrator can perform super-admin operations"`
 }
 
 type AuthData struct {

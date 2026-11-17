@@ -64,6 +64,9 @@ type CompanyDetail struct {
 	BusinessLicenseContentType string        `json:"business_license_content_type,omitempty"`
 	RegisteredAddress          string        `json:"registered_address"`
 	Introduction               string        `json:"introduction,omitempty"`
+	StorePlatformID            uint64        `json:"store_platform_id,omitempty"`
+	StorePlatformName          string        `json:"store_platform_name,omitempty"`
+	StoreURL                   string        `json:"store_url,omitempty"`
 	Offices                    []string      `json:"offices"`
 	Factories                  []string      `json:"factories"`
 	Contacts                   []ContactInfo `json:"contacts"`
@@ -73,6 +76,7 @@ type CompanyDetail struct {
 type DetailInfo struct {
 	VerificationListItem
 	UserStatus uint8           `json:"user_status"`
+	Role       uint8           `json:"role" dc:"0 pending selection, 1 buyer, 2 supplier"`
 	Personal   *PersonalDetail `json:"personal,omitempty"`
 	Company    *CompanyDetail  `json:"company,omitempty"`
 }

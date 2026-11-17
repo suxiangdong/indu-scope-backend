@@ -36,6 +36,7 @@ type ListItem struct {
 type Detail struct {
 	ListItem
 	UserStatus uint8
+	Role       uint8
 	Personal   *PersonalDetail
 	Company    *CompanyDetail
 }
@@ -67,6 +68,9 @@ type CompanyDetail struct {
 	BusinessLicenseContentType string
 	RegisteredAddress          string
 	Introduction               string
+	StorePlatformID            uint64
+	StorePlatformName          string
+	StoreURL                   string
 	Offices                    []string
 	Factories                  []string
 	Contacts                   []Contact

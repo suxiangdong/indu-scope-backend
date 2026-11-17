@@ -1,0 +1,1 @@
+-- Keep the column on rollback because the application writes plaintext IDs.

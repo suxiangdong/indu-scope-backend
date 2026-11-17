@@ -17,6 +17,7 @@ type AdminUsers struct {
 	Phone        any //
 	PasswordHash any //
 	Status       any //
+	IsSuperAdmin any //
 	LastLoginAt  any //
 	CreatedAt    any //
 	UpdatedAt    any //

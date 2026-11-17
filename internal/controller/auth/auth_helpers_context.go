@@ -7,10 +7,11 @@ import (
 
 func toUserInfo(user authmodel.User) v1.UserInfo {
 	return v1.UserInfo{
-		ID:       user.ID,
-		Phone:    user.Phone,
-		Role:     user.Role,
-		UserType: user.UserType,
-		Status:   user.Status,
+		ID:          user.ID,
+		Phone:       user.Phone,
+		CompanyName: user.CompanyName,
+		Role:        user.Role,
+		UserType:    user.UserType,
+		Status:      user.Status,
 	}
 }

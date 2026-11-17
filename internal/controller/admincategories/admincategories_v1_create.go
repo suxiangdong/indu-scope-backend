@@ -8,6 +8,9 @@ import (
 )
 
 func (c *ControllerV1) Create(ctx context.Context, req *v1.CreateReq) (res *v1.CreateRes, err error) {
+	if req == nil {
+		return nil, invalidRequest("category create request is required")
+	}
 	item, err := service.AdminCategories().Create(ctx, normalizeParentID(req.ParentID), req.Name, req.SortOrder, statusValue(req.Status))
 	if err != nil {
 		return nil, toAPIError(ctx, err)

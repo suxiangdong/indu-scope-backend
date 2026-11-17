@@ -24,5 +24,5 @@ ALTER TABLE personal_verifications
     ADD CONSTRAINT fk_personal_verifications_store_platform
         FOREIGN KEY (store_platform_id) REFERENCES store_platforms (id) ON DELETE SET NULL;
 
--- id_number_encrypted is kept temporarily for compatibility with historical
--- rows. New and resubmitted records use the plaintext id_number column.
+-- id_number_encrypted is kept for compatibility with historical rows. The
+-- application continues to write the plaintext id_number column.

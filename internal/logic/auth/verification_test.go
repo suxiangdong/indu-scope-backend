@@ -29,3 +29,15 @@ func TestResolveVerificationRole(t *testing.T) {
 		})
 	}
 }
+
+func TestValidIDNumber(t *testing.T) {
+	if !validIDNumber("11010519491231002X") {
+		t.Fatal("expected valid Chinese 18-digit identity number")
+	}
+	if validIDNumber("110105194912310021") {
+		t.Fatal("expected invalid identity checksum")
+	}
+	if validIDNumber("11010519491331002X") {
+		t.Fatal("expected invalid identity date")
+	}
+}

@@ -118,3 +118,7 @@ func statusValue(status *uint) uint {
 	}
 	return *status
 }
+
+func invalidRequest(message string) error {
+	return gerror.NewCode(gcode.CodeInvalidParameter, message)
+}

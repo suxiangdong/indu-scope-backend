@@ -1,0 +1,9 @@
+ALTER TABLE payment_orders
+    DROP COLUMN auto_renew_enabled_snapshot,
+    DROP COLUMN duration_days_snapshot,
+    DROP COLUMN billing_cycle_snapshot,
+    DROP COLUMN plan_type_snapshot,
+    DROP COLUMN plan_level_snapshot,
+    DROP COLUMN plan_description_snapshot,
+    DROP COLUMN plan_name_snapshot,
+    DROP COLUMN plan_code_snapshot;

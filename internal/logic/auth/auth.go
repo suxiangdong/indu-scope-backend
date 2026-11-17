@@ -9,6 +9,7 @@ import (
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"golang.org/x/crypto/bcrypt"
@@ -86,7 +87,7 @@ func (s *sAuth) Login(ctx context.Context, phone, password string) (authmodel.Au
 		cols   = dao.Users.Columns()
 	)
 	err := dao.Users.Ctx(ctx).
-		Fields(cols.Id, cols.Phone, cols.PasswordHash, cols.Status, cols.Role, cols.UserType).
+		Fields(cols.Id, cols.Phone, cols.CompanyName, cols.PasswordHash, cols.Status, cols.Role, cols.UserType).
 		Where(do.Users{Phone: phone}).
 		Scan(&record)
 	if errors.Is(err, sql.ErrNoRows) || record == nil {
@@ -102,7 +103,7 @@ func (s *sAuth) Login(ctx context.Context, phone, password string) (authmodel.Au
 		return authmodel.AuthResult{}, consts.ErrUserDisabled
 	}
 	result, err := authutil.IssueUserToken(ctx, authmodel.User{
-		ID: int64(record.Id), Phone: record.Phone, Role: uint8(record.Role),
+		ID: int64(record.Id), Phone: record.Phone, CompanyName: record.CompanyName, Role: uint8(record.Role),
 		UserType: uint8(record.UserType), Status: uint8(record.Status),
 	})
 	if err != nil {
@@ -138,7 +139,7 @@ func (s *sAuth) WechatPhoneLogin(ctx context.Context, loginCode, phoneCode strin
 
 	var byOpenID *wechatUserRecord
 	err = dao.Users.Ctx(ctx).
-		Fields("id, phone, password_hash, status, role, user_type, wechat_openid").
+		Fields("id, phone, company_name, password_hash, status, role, user_type, wechat_openid").
 		Where("wechat_openid", openID).
 		Scan(&byOpenID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -152,7 +153,7 @@ func (s *sAuth) WechatPhoneLogin(ctx context.Context, loginCode, phoneCode strin
 	if user == nil {
 		var byPhone *wechatUserRecord
 		err = dao.Users.Ctx(ctx).
-			Fields("id, phone, password_hash, status, role, user_type, wechat_openid").
+			Fields("id, phone, company_name, password_hash, status, role, user_type, wechat_openid").
 			Where(do.Users{Phone: phone}).
 			Scan(&byPhone)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -180,21 +181,18 @@ func (s *sAuth) WechatPhoneLogin(ctx context.Context, loginCode, phoneCode strin
 			return authmodel.AuthResult{}, gerror.Wrap(err, "create wechat user")
 		}
 		user = &wechatUserRecord{Id: uint64(id), Phone: phone, Status: 0, Role: 0, UserType: 1, WechatOpenID: openID}
-	} else if user.WechatOpenID == "" {
-		if _, err := dao.Users.Ctx(ctx).Data(g.Map{"wechat_openid": openID}).Where(do.Users{Id: user.Id}).Update(); err != nil {
-			if isDuplicateKey(err) {
-				return authmodel.AuthResult{}, consts.ErrWechatPhoneConflict
-			}
-			return authmodel.AuthResult{}, gerror.Wrap(err, "bind wechat user")
+	} else {
+		user, err = bindWechatUser(ctx, dao.Users.DB(), user.Id, phone, openID)
+		if err != nil {
+			return authmodel.AuthResult{}, err
 		}
-		user.WechatOpenID = openID
 	}
 	if user.Status == 2 {
 		return authmodel.AuthResult{}, consts.ErrUserDisabled
 	}
 
 	result, err := authutil.IssueUserToken(ctx, authmodel.User{
-		ID: int64(user.Id), Phone: user.Phone, Role: uint8(user.Role),
+		ID: int64(user.Id), Phone: user.Phone, CompanyName: user.CompanyName, Role: uint8(user.Role),
 		UserType: uint8(user.UserType), Status: uint8(user.Status),
 	})
 	if err != nil {
@@ -206,9 +204,43 @@ func (s *sAuth) WechatPhoneLogin(ctx context.Context, loginCode, phoneCode strin
 	return result, nil
 }
 
+// Serialize first-time binding with role/status updates and other logins.
+// The earlier phone/OpenID lookups only locate the row; they cannot authorize
+// overwriting a binding that another request committed in the meantime.
+func bindWechatUser(ctx context.Context, db gdb.DB, userID uint64, phone, openID string) (*wechatUserRecord, error) {
+	var record *wechatUserRecord
+	err := db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if err := tx.Model("users").Fields("id", "phone", "company_name", "status", "role", "user_type", "wechat_openid").
+			Where("id", userID).LockUpdate().Scan(&record); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return gerror.Wrap(err, "lock wechat user")
+		}
+		if record == nil || record.Phone != phone || (record.WechatOpenID != "" && record.WechatOpenID != openID) {
+			return consts.ErrWechatPhoneConflict
+		}
+		if record.Status == 2 {
+			return consts.ErrUserDisabled
+		}
+		if record.WechatOpenID == "" {
+			if _, err := tx.Model("users").Where("id", userID).Data(g.Map{"wechat_openid": openID}).Update(); err != nil {
+				if isDuplicateKey(err) {
+					return consts.ErrWechatPhoneConflict
+				}
+				return gerror.Wrap(err, "bind wechat user")
+			}
+			record.WechatOpenID = openID
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
 type wechatUserRecord struct {
 	Id           uint64 `orm:"id"`
 	Phone        string `orm:"phone"`
+	CompanyName  string `orm:"company_name"`
 	PasswordHash string `orm:"password_hash"`
 	WechatOpenID string `orm:"wechat_openid"`
 	Status       uint   `orm:"status"`
@@ -274,7 +306,7 @@ func (s *sAuth) loadUserByID(ctx context.Context, id int64) (authmodel.User, err
 		cols   = dao.Users.Columns()
 	)
 	err := dao.Users.Ctx(ctx).
-		Fields(cols.Id, cols.Phone, cols.Status, cols.Role, cols.UserType).
+		Fields(cols.Id, cols.Phone, cols.CompanyName, cols.Status, cols.Role, cols.UserType).
 		Where(do.Users{Id: id}).
 		Scan(&record)
 	if errors.Is(err, sql.ErrNoRows) || record == nil {
@@ -287,7 +319,7 @@ func (s *sAuth) loadUserByID(ctx context.Context, id int64) (authmodel.User, err
 		return authmodel.User{}, consts.ErrUserDisabled
 	}
 	return authmodel.User{
-		ID: int64(record.Id), Phone: record.Phone, Role: uint8(record.Role),
+		ID: int64(record.Id), Phone: record.Phone, CompanyName: record.CompanyName, Role: uint8(record.Role),
 		UserType: uint8(record.UserType), Status: uint8(record.Status),
 	}, nil
 }

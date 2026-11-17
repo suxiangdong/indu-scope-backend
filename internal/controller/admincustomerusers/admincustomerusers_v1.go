@@ -15,6 +15,9 @@ import (
 )
 
 func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (*v1.ListRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "customer user list request is required")
+	}
 	result, err := service.AdminCustomerUsers().List(ctx, adminCustomerUserModel.ListFilter{
 		Phone: req.Phone, Role: req.Role, UserType: req.UserType, Status: req.Status,
 	})
@@ -29,6 +32,9 @@ func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (*v1.ListRes, 
 }
 
 func (c *ControllerV1) UpdateStatus(ctx context.Context, req *v1.UpdateStatusReq) (*v1.UpdateStatusRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "customer user status request is required")
+	}
 	item, err := service.AdminCustomerUsers().UpdateStatus(ctx, req.ID, req.Status)
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -36,9 +42,20 @@ func (c *ControllerV1) UpdateStatus(ctx context.Context, req *v1.UpdateStatusReq
 	return &v1.UpdateStatusRes{CustomerUserInfo: toAPI(item)}, nil
 }
 
+func (c *RoleControllerV1) UpdateRole(ctx context.Context, req *v1.UpdateRoleReq) (*v1.UpdateRoleRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "customer user role request is required")
+	}
+	item, err := service.AdminCustomerUsers().UpdateRole(ctx, req.ID, req.Role)
+	if err != nil {
+		return nil, toAPIError(ctx, err)
+	}
+	return &v1.UpdateRoleRes{CustomerUserInfo: toAPI(item)}, nil
+}
+
 func toAPI(item adminCustomerUserModel.UserItem) v1.CustomerUserInfo {
 	return v1.CustomerUserInfo{
-		ID: item.ID, Phone: item.Phone, Role: item.Role, UserType: item.UserType, Status: item.Status,
+		ID: item.ID, Phone: item.Phone, CompanyName: item.CompanyName, Role: item.Role, UserType: item.UserType, Status: item.Status,
 		VerificationType: item.VerificationType, VerificationStatus: item.VerificationStatus,
 		WechatBound: item.WechatBound, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}

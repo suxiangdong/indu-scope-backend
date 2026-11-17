@@ -14,6 +14,8 @@ type CompanyProfiles struct {
 	Id               any //
 	UserId           any //
 	IntroductionHtml any //
+	StorePlatformId  any //
+	StoreUrl         any //
 	Offices          any //
 	Factories        any //
 	CreatedAt        any //

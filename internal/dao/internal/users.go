@@ -23,6 +23,7 @@ type UsersDao struct {
 type UsersColumns struct {
 	Id           string //
 	Phone        string //
+	CompanyName  string //
 	WechatOpenID string //
 	PasswordHash string //
 	Status       string //
@@ -36,6 +37,7 @@ type UsersColumns struct {
 var usersColumns = UsersColumns{
 	Id:           "id",
 	Phone:        "phone",
+	CompanyName:  "company_name",
 	WechatOpenID: "wechat_openid",
 	PasswordHash: "password_hash",
 	Status:       "status",

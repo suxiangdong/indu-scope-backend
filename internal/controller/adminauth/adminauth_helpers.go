@@ -25,11 +25,12 @@ func toAuthData(result authmodel.AdminAuthResult) v1.AuthData {
 
 func toUserInfo(user authmodel.AdminUser) v1.AdminUserInfo {
 	return v1.AdminUserInfo{
-		ID:       user.ID,
-		Username: user.Username,
-		Name:     user.Name,
-		Phone:    user.Phone,
-		Status:   user.Status,
+		ID:           user.ID,
+		Username:     user.Username,
+		Name:         user.Name,
+		Phone:        user.Phone,
+		Status:       user.Status,
+		IsSuperAdmin: user.IsSuperAdmin,
 	}
 }
 

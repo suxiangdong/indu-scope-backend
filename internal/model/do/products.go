@@ -10,18 +10,16 @@ import (
 
 // Products is the golang structure of table products for DAO operations like Where/Data.
 type Products struct {
-	g.Meta          `orm:"table:products, do:true"`
-	Id              any //
-	SupplierUserId  any //
-	CategoryId      any //
-	Name            any //
-	DescriptionHtml any //
-	ConditionCode   any //
-	StockQuantity   any //
-	StockUnitCode   any //
-	StockUpdatedAt  any //
-	StockUpdatedBy  any //
-	Status          any //
-	CreatedAt       any //
-	UpdatedAt       any //
+	g.Meta         `orm:"table:products, do:true"`
+	Id             any //
+	SupplierUserId any //
+	CategoryId     any //
+	Name           any //
+	StockUnitId    any //
+	StockQuantity  any //
+	StockUpdatedAt any //
+	StockUpdatedBy any //
+	Status         any //
+	CreatedAt      any //
+	UpdatedAt      any //
 }

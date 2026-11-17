@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 
@@ -25,15 +26,18 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/model/entity"
 	storePlatformModel "github.com/suxiangdong/indu-scope-backend/internal/model/storeplatform"
 	verificationModel "github.com/suxiangdong/indu-scope-backend/internal/model/verification"
+	"github.com/suxiangdong/indu-scope-backend/internal/ocr"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 	"github.com/suxiangdong/indu-scope-backend/internal/storage"
 )
 
 const (
-	businessLicensePurpose = "business_license"
-	idCardFrontPurpose     = "id_card_front"
-	idCardBackPurpose      = "id_card_back"
-	maxBusinessLicenseSize = 10 * 1024 * 1024
+	businessLicensePurpose      = "business_license"
+	idCardFrontPurpose          = "id_card_front"
+	idCardBackPurpose           = "id_card_back"
+	maxBusinessLicenseSize      = 10 * 1024 * 1024
+	businessLicenseOCRCooldown  = 30 * time.Second
+	businessLicenseOCRKeyPrefix = "indu_scope:ocr:business_license:"
 )
 
 func (s *sAuth) GetVerification(ctx context.Context) (verificationModel.Summary, error) {
@@ -100,52 +104,11 @@ func (s *sAuth) SubmitPersonalVerification(ctx context.Context, input verificati
 	if platform == nil {
 		return verificationModel.Summary{}, consts.ErrStorePlatformNotFound
 	}
-	if err := validateIDCardFile(ctx, uint64(user.ID), idCardFrontPurpose, input.IDFrontEndpoint, input.IDFrontBucket, input.IDFrontPath); err != nil {
-		return verificationModel.Summary{}, err
-	}
-	if err := validateIDCardFile(ctx, uint64(user.ID), idCardBackPurpose, input.IDBackEndpoint, input.IDBackBucket, input.IDBackPath); err != nil {
-		return verificationModel.Summary{}, err
-	}
-	if companyRecord, err := loadCompanyVerification(ctx, uint64(user.ID)); err != nil {
-		return verificationModel.Summary{}, err
-	} else if companyRecord != nil {
-		return verificationModel.Summary{}, consts.ErrVerificationTypeConflict
-	}
-	record, err := loadPersonalVerification(ctx, uint64(user.ID))
+	replaced, err := persistPersonalVerification(ctx, dao.Users.DB(), uint64(user.ID), role, input)
 	if err != nil {
 		return verificationModel.Summary{}, err
 	}
-	if record != nil && (record.ReviewStatus != uint(verificationModel.ReviewStatusRejected) || !record.VerifiedAt.IsZero()) {
-		return verificationModel.Summary{}, consts.ErrVerificationLocked
-	}
-	data := g.Map{
-		"user_id":           user.ID,
-		"real_name":         input.RealName,
-		"id_number":         input.IDNumber,
-		"store_platform_id": input.StorePlatformID,
-		"store_url":         input.StoreURL,
-		"id_front_bucket":   input.IDFrontBucket,
-		"id_front_path":     input.IDFrontPath,
-		"id_front_endpoint": input.IDFrontEndpoint,
-		"id_back_bucket":    input.IDBackBucket,
-		"id_back_path":      input.IDBackPath,
-		"id_back_endpoint":  input.IDBackEndpoint,
-		"verified_at":       nil,
-		"review_status":     verificationModel.ReviewStatusPending,
-		"review_reason":     nil,
-		"reviewed_by":       nil,
-		"reviewed_at":       nil,
-	}
-	if record == nil {
-		if _, err := dao.PersonalVerifications.Ctx(ctx).Data(data).Insert(); err != nil {
-			return verificationModel.Summary{}, gerror.Wrap(err, "create personal verification")
-		}
-	} else if _, err := dao.PersonalVerifications.Ctx(ctx).Where(do.PersonalVerifications{Id: record.Id}).Data(data).Update(); err != nil {
-		return verificationModel.Summary{}, gerror.Wrap(err, "resubmit personal verification")
-	}
-	if _, err := dao.Users.Ctx(ctx).Where(do.Users{Id: user.ID}).Data(g.Map{"role": role, "user_type": 1, "status": 0}).Update(); err != nil {
-		return verificationModel.Summary{}, gerror.Wrap(err, "update personal verification status")
-	}
+	cleanupReplacedVerificationFiles(ctx, uint64(user.ID), replaced)
 	user.Role, user.UserType, user.Status = role, 1, 0
 	return s.loadVerificationSummary(ctx, *user)
 }
@@ -166,6 +129,7 @@ func (s *sAuth) SubmitCompanyVerification(ctx context.Context, input verificatio
 	input.BusinessLicenseEndpoint = strings.TrimSpace(input.BusinessLicenseEndpoint)
 	input.RegisteredAddress = strings.TrimSpace(input.RegisteredAddress)
 	input.Introduction = strings.TrimSpace(input.Introduction)
+	input.StoreURL = strings.TrimSpace(input.StoreURL)
 	input.Offices = normalizeCompanyLocations(input.Offices)
 	input.Factories = normalizeCompanyLocations(input.Factories)
 	for index := range input.Contacts {
@@ -188,55 +152,47 @@ func (s *sAuth) SubmitCompanyVerification(ctx context.Context, input verificatio
 	if len(input.Offices) > 20 || len(input.Factories) > 20 {
 		return verificationModel.Summary{}, &consts.InvalidParameterError{Message: "offices and factories can contain at most 20 locations each"}
 	}
+	if err := validateCompanyLocations(input.Offices, "offices"); err != nil {
+		return verificationModel.Summary{}, err
+	}
+	if err := validateCompanyLocations(input.Factories, "factories"); err != nil {
+		return verificationModel.Summary{}, err
+	}
+	if role == 1 {
+		if len(input.Factories) > 0 {
+			return verificationModel.Summary{}, &consts.InvalidParameterError{Message: "buyer verification must not include factory locations"}
+		}
+		if len(input.Offices) == 0 {
+			return verificationModel.Summary{}, &consts.InvalidParameterError{Message: "at least one office location is required for buyer verification"}
+		}
+		if input.StorePlatformID == 0 {
+			return verificationModel.Summary{}, &consts.InvalidParameterError{Message: "store_platform_id is required for buyer verification"}
+		}
+		if err := validateStoreURL(input.StoreURL); err != nil {
+			return verificationModel.Summary{}, err
+		}
+		var platform *entity.StorePlatforms
+		if err := dao.StorePlatforms.Ctx(ctx).Where(do.StorePlatforms{Id: input.StorePlatformID, Status: 1}).Scan(&platform); err != nil {
+			return verificationModel.Summary{}, gerror.Wrap(err, "query store platform")
+		}
+		if platform == nil {
+			return verificationModel.Summary{}, consts.ErrStorePlatformNotFound
+		}
+	} else {
+		if len(input.Offices) == 0 || len(input.Factories) == 0 {
+			return verificationModel.Summary{}, &consts.InvalidParameterError{Message: "supplier verification requires at least one office and one factory location"}
+		}
+		input.StorePlatformID = 0
+		input.StoreURL = ""
+	}
 	if err := validateCompanyContacts(input.Contacts); err != nil {
 		return verificationModel.Summary{}, err
 	}
-	if personalRecord, err := loadPersonalVerification(ctx, uint64(user.ID)); err != nil {
-		return verificationModel.Summary{}, err
-	} else if personalRecord != nil {
-		return verificationModel.Summary{}, consts.ErrVerificationTypeConflict
-	}
-
-	record, err := loadCompanyVerification(ctx, uint64(user.ID))
+	replaced, err := persistCompanyVerification(ctx, dao.Users.DB(), uint64(user.ID), role, input)
 	if err != nil {
 		return verificationModel.Summary{}, err
 	}
-	if record != nil && (record.ReviewStatus != uint(verificationModel.ReviewStatusRejected) || !record.VerifiedAt.IsZero()) {
-		return verificationModel.Summary{}, consts.ErrVerificationLocked
-	}
-	if err := validateBusinessLicenseFile(ctx, uint64(user.ID), input.BusinessLicenseEndpoint, input.BusinessLicenseBucket, input.BusinessLicensePath); err != nil {
-		return verificationModel.Summary{}, err
-	}
-	data := g.Map{
-		"user_id":                    user.ID,
-		"company_name":               input.CompanyName,
-		"unified_social_credit_code": input.UnifiedSocialCreditCode,
-		"business_license_bucket":    input.BusinessLicenseBucket,
-		"business_license_path":      input.BusinessLicensePath,
-		"business_license_endpoint":  input.BusinessLicenseEndpoint,
-		"registered_address":         input.RegisteredAddress,
-		"verified_at":                nil,
-		"review_status":              verificationModel.ReviewStatusPending,
-		"review_reason":              nil,
-		"reviewed_by":                nil,
-		"reviewed_at":                nil,
-	}
-	if record == nil {
-		if _, err := dao.CompanyVerifications.Ctx(ctx).Data(data).Insert(); err != nil {
-			return verificationModel.Summary{}, gerror.Wrap(err, "create company verification")
-		}
-	} else if _, err := dao.CompanyVerifications.Ctx(ctx).Where(do.CompanyVerifications{Id: record.Id}).Data(data).Update(); err != nil {
-		return verificationModel.Summary{}, gerror.Wrap(err, "resubmit company verification")
-	}
-	if err := saveCompanyProfile(ctx, uint64(user.ID), input); err != nil {
-		return verificationModel.Summary{}, err
-	}
-	if err := replaceCompanyContacts(ctx, uint64(user.ID), input.Contacts); err != nil {
-		return verificationModel.Summary{}, err
-	}
-	if _, err := dao.Users.Ctx(ctx).Where(do.Users{Id: user.ID}).Data(g.Map{"role": role, "user_type": 2, "status": 0}).Update(); err != nil {
-		return verificationModel.Summary{}, gerror.Wrap(err, "update company verification status")
-	}
+	cleanupReplacedVerificationFiles(ctx, uint64(user.ID), replaced)
 	user.Role, user.UserType, user.Status = role, 2, 0
 	return s.loadVerificationSummary(ctx, *user)
 }
@@ -281,16 +237,17 @@ func (s *sAuth) UploadBusinessLicense(ctx context.Context, input verificationMod
 	if _, err := rand.Read(nonce); err != nil {
 		return verificationModel.BusinessLicenseInfo{}, gerror.Wrap(err, "generate business license object key")
 	}
-	client, err := storage.NewOSSClient(ctx)
+	client, err := storage.OSSClient()
 	if err != nil {
 		return verificationModel.BusinessLicenseInfo{}, gerror.Wrap(err, "initialize oss client")
 	}
 	objectKey := client.ObjectKey(businessLicensePurpose, fmt.Sprintf("%d-%d-%s%s", user.ID, time.Now().UnixNano(), hex.EncodeToString(nonce), extensionForContentType(contentType)))
 	etag, err := client.Upload(ctx, objectKey, input.Reader, input.Size, contentType)
 	if err != nil {
+		_ = storage.DeleteWithTimeout(ctx, client, objectKey)
 		return verificationModel.BusinessLicenseInfo{}, gerror.Wrap(err, "upload business license to oss")
 	}
-	if _, err := g.DB().Model("user_files").Ctx(ctx).Data(g.Map{
+	if _, err := dao.UserFiles.Ctx(ctx).Data(g.Map{
 		"user_id":       user.ID,
 		"purpose":       businessLicensePurpose,
 		"endpoint":      client.EndpointHost(),
@@ -301,12 +258,75 @@ func (s *sAuth) UploadBusinessLicense(ctx context.Context, input verificationMod
 		"file_size":     input.Size,
 		"etag":          etag,
 	}).Insert(); err != nil {
+		_ = storage.DeleteWithTimeout(ctx, client, objectKey)
 		return verificationModel.BusinessLicenseInfo{}, gerror.Wrap(err, "save business license metadata")
 	}
 	return verificationModel.BusinessLicenseInfo{
 		Endpoint: client.EndpointHost(), Bucket: client.Bucket(), Path: objectKey,
 		Filename: filename, ContentType: contentType, Size: input.Size,
 	}, nil
+}
+
+func (s *sAuth) RecognizeBusinessLicense(ctx context.Context) (verificationModel.BusinessLicenseOCR, error) {
+	user, err := authenticatedUser(ctx)
+	if err != nil {
+		return verificationModel.BusinessLicenseOCR{}, err
+	}
+	if user.Status == 1 {
+		return verificationModel.BusinessLicenseOCR{}, consts.ErrVerificationLocked
+	}
+	var record *userFileRecord
+	err = dao.UserFiles.Ctx(ctx).
+		Where("user_id", user.ID).
+		Where("purpose", businessLicensePurpose).
+		OrderDesc("id").Limit(1).Scan(&record)
+	if errors.Is(err, sql.ErrNoRows) {
+		record = nil
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return verificationModel.BusinessLicenseOCR{}, gerror.Wrap(err, "query business license metadata")
+	}
+	if record == nil {
+		return verificationModel.BusinessLicenseOCR{}, &consts.InvalidParameterError{Message: "business license file must be uploaded before recognition"}
+	}
+	if record.ContentType == "application/pdf" {
+		return verificationModel.BusinessLicenseOCR{}, &consts.InvalidParameterError{Message: "business license OCR currently supports image files only"}
+	}
+	ossClient, err := storage.OSSClient()
+	if err != nil {
+		return verificationModel.BusinessLicenseOCR{}, gerror.Wrap(err, "initialize oss client")
+	}
+	imageURL, err := ossClient.SignedURLFor(record.Endpoint, record.Bucket, record.ObjectKey, 10*time.Minute)
+	if err != nil {
+		return verificationModel.BusinessLicenseOCR{}, gerror.Wrap(err, "create business license OCR URL")
+	}
+	if err := reserveBusinessLicenseOCR(ctx, uint64(user.ID)); err != nil {
+		return verificationModel.BusinessLicenseOCR{}, err
+	}
+	result, err := ocr.RecognizeBusinessLicense(ctx, imageURL)
+	if err != nil {
+		return verificationModel.BusinessLicenseOCR{}, gerror.Wrap(err, "recognize business license")
+	}
+	return verificationModel.BusinessLicenseOCR{
+		CompanyName:             result.CompanyName,
+		UnifiedSocialCreditCode: result.UnifiedSocialCreditCode,
+		BusinessAddress:         result.BusinessAddress,
+	}, nil
+}
+
+func reserveBusinessLicenseOCR(ctx context.Context, userID uint64) error {
+	if userID == 0 {
+		return consts.ErrTokenInvalid
+	}
+	key := fmt.Sprintf("%s%d", businessLicenseOCRKeyPrefix, userID)
+	result, err := g.Redis().Do(ctx, "SET", key, "1", "NX", "EX", int(businessLicenseOCRCooldown.Seconds()))
+	if err != nil {
+		return gerror.Wrap(err, "reserve business license OCR request")
+	}
+	if result == nil || !strings.EqualFold(result.String(), "OK") {
+		return &consts.InvalidParameterError{Message: "营业执照识别请求过于频繁，请稍后再试"}
+	}
+	return nil
 }
 
 func (s *sAuth) UploadIDCard(ctx context.Context, input verificationModel.IDCardUploadInput) (verificationModel.IDCardUploadInfo, error) {
@@ -361,20 +381,22 @@ func (s *sAuth) UploadIDCard(ctx context.Context, input verificationModel.IDCard
 	if _, err := rand.Read(nonce); err != nil {
 		return verificationModel.IDCardUploadInfo{}, gerror.Wrap(err, "generate identity document object key")
 	}
-	client, err := storage.NewOSSClient(ctx)
+	client, err := storage.OSSClient()
 	if err != nil {
 		return verificationModel.IDCardUploadInfo{}, gerror.Wrap(err, "initialize oss client")
 	}
 	objectKey := client.ObjectKey("id_card/"+input.Side, fmt.Sprintf("%d-%d-%s%s", user.ID, time.Now().UnixNano(), hex.EncodeToString(nonce), extensionForContentType(contentType)))
 	etag, err := client.Upload(ctx, objectKey, input.Reader, input.Size, contentType)
 	if err != nil {
+		_ = storage.DeleteWithTimeout(ctx, client, objectKey)
 		return verificationModel.IDCardUploadInfo{}, gerror.Wrap(err, "upload identity document to oss")
 	}
-	if _, err := g.DB().Model("user_files").Ctx(ctx).Data(g.Map{
+	if _, err := dao.UserFiles.Ctx(ctx).Data(g.Map{
 		"user_id": user.ID, "purpose": purpose, "endpoint": client.EndpointHost(), "bucket": client.Bucket(),
 		"object_key": objectKey, "original_name": filename, "content_type": contentType,
 		"file_size": input.Size, "etag": etag,
 	}).Insert(); err != nil {
+		_ = storage.DeleteWithTimeout(ctx, client, objectKey)
 		return verificationModel.IDCardUploadInfo{}, gerror.Wrap(err, "save identity document metadata")
 	}
 	return verificationModel.IDCardUploadInfo{
@@ -462,8 +484,12 @@ func (s *sAuth) loadVerificationSummary(ctx context.Context, user authmodel.User
 	if company != nil {
 		offices, factories := []string{}, []string{}
 		introduction := ""
+		storePlatformID := uint64(0)
+		storeURL := ""
 		if profile != nil {
 			introduction = profile.IntroductionHtml
+			storePlatformID = profile.StorePlatformId
+			storeURL = profile.StoreUrl
 			if err := json.Unmarshal([]byte(profile.Offices), &offices); err != nil {
 				return verificationModel.Summary{}, gerror.Wrap(err, "decode company offices")
 			}
@@ -479,12 +505,17 @@ func (s *sAuth) loadVerificationSummary(ctx context.Context, user authmodel.User
 		if err != nil {
 			return verificationModel.Summary{}, err
 		}
+		storePlatformName, err := loadStorePlatformName(ctx, storePlatformID)
+		if err != nil {
+			return verificationModel.Summary{}, err
+		}
 		companyInfo := &verificationModel.CompanyInfo{
 			CompanyName: company.CompanyName, UnifiedSocialCreditCode: company.UnifiedSocialCreditCode,
 			BusinessLicenseEndpoint: company.BusinessLicenseEndpoint,
 			BusinessLicenseBucket:   company.BusinessLicenseBucket, BusinessLicensePath: company.BusinessLicensePath,
 			RegisteredAddress: company.RegisteredAddress,
-			Introduction:      introduction, Offices: offices, Factories: factories, Contacts: contactItems,
+			Introduction:      introduction, StorePlatformID: storePlatformID, StorePlatformName: storePlatformName, StoreURL: storeURL,
+			Offices: offices, Factories: factories, Contacts: contactItems,
 			VerifiedAt:   formatVerificationTime(company.VerifiedAt),
 			ReviewStatus: uint8(company.ReviewStatus), ReviewReason: company.ReviewReason,
 			ReviewedAt: formatVerificationTime(company.ReviewedAt),
@@ -535,7 +566,7 @@ func loadBusinessLicenseFile(ctx context.Context, userID uint64, endpoint, bucke
 	bucket = strings.TrimSpace(bucket)
 	objectPath = strings.TrimSpace(objectPath)
 	var record *userFileRecord
-	model := g.DB().Model("user_files").Ctx(ctx).
+	model := dao.UserFiles.Ctx(ctx).
 		Where("user_id", userID).
 		Where("purpose", businessLicensePurpose)
 	if endpoint != "" && bucket != "" && objectPath != "" {
@@ -553,50 +584,6 @@ func loadBusinessLicenseFile(ctx context.Context, userID uint64, endpoint, bucke
 		return nil, gerror.Wrap(err, "query business license metadata")
 	}
 	return record, nil
-}
-
-func validateBusinessLicenseFile(ctx context.Context, userID uint64, endpoint, bucket, objectPath string) error {
-	endpoint = strings.TrimSpace(endpoint)
-	bucket = strings.TrimSpace(bucket)
-	objectPath = strings.TrimSpace(objectPath)
-	if endpoint == "" || bucket == "" || objectPath == "" {
-		return &consts.InvalidParameterError{Message: "business license endpoint, bucket and path are required"}
-	}
-	record, err := loadBusinessLicenseFile(ctx, userID, endpoint, bucket, objectPath)
-	if err != nil {
-		return err
-	}
-	if record == nil {
-		return &consts.InvalidParameterError{Message: "business license file must be uploaded before submission"}
-	}
-	return nil
-}
-
-func validateIDCardFile(ctx context.Context, userID uint64, purpose, endpoint, bucket, objectPath string) error {
-	endpoint = strings.TrimSpace(endpoint)
-	bucket = strings.TrimSpace(bucket)
-	objectPath = strings.TrimSpace(objectPath)
-	if endpoint == "" || bucket == "" || objectPath == "" {
-		return &consts.InvalidParameterError{Message: "id card front and back images are required"}
-	}
-	var record *userFileRecord
-	err := g.DB().Model("user_files").Ctx(ctx).
-		Where("user_id", userID).
-		Where("purpose", purpose).
-		Where("endpoint", endpoint).
-		Where("bucket", bucket).
-		Where("object_key", objectPath).
-		Scan(&record)
-	if errors.Is(err, sql.ErrNoRows) {
-		record = nil
-	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return gerror.Wrap(err, "query identity document metadata")
-	}
-	if record == nil {
-		return &consts.InvalidParameterError{Message: "identity document images must be uploaded before submission"}
-	}
-	return nil
 }
 
 func allowedBusinessLicenseContentType(contentType string) bool {
@@ -672,7 +659,7 @@ func loadCompanyContacts(ctx context.Context, userID uint64) ([]*entity.CompanyC
 	return records, nil
 }
 
-func saveCompanyProfile(ctx context.Context, userID uint64, input verificationModel.CompanyInput) error {
+func saveCompanyProfileTx(ctx context.Context, tx gdb.TX, userID uint64, input verificationModel.CompanyInput) error {
 	offices, err := json.Marshal(input.Offices)
 	if err != nil {
 		return gerror.Wrap(err, "encode company offices")
@@ -681,30 +668,35 @@ func saveCompanyProfile(ctx context.Context, userID uint64, input verificationMo
 	if err != nil {
 		return gerror.Wrap(err, "encode company factories")
 	}
-	record, err := loadCompanyProfile(ctx, userID)
-	if err != nil {
-		return err
+	var record *entity.CompanyProfiles
+	if err := tx.Model("company_profiles").Where("user_id", userID).Scan(&record); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return gerror.Wrap(err, "query company profile")
+	}
+	var storePlatformID any
+	if input.StorePlatformID > 0 {
+		storePlatformID = input.StorePlatformID
 	}
 	data := g.Map{
 		"user_id": userID, "introduction_html": input.Introduction,
+		"store_platform_id": storePlatformID, "store_url": input.StoreURL,
 		"offices": string(offices), "factories": string(factories),
 	}
 	if record == nil {
-		if _, err := dao.CompanyProfiles.Ctx(ctx).Data(data).Insert(); err != nil {
+		if _, err := tx.Model("company_profiles").Data(data).Insert(); err != nil {
 			return gerror.Wrap(err, "create company profile")
 		}
-	} else if _, err := dao.CompanyProfiles.Ctx(ctx).Where(do.CompanyProfiles{UserId: userID}).Data(data).Update(); err != nil {
+	} else if _, err := tx.Model("company_profiles").Where("user_id", userID).Data(data).Update(); err != nil {
 		return gerror.Wrap(err, "update company profile")
 	}
 	return nil
 }
 
-func replaceCompanyContacts(ctx context.Context, userID uint64, contacts []verificationModel.ContactInput) error {
-	if _, err := dao.CompanyContacts.Ctx(ctx).Where(do.CompanyContacts{UserId: userID}).Delete(); err != nil {
+func replaceCompanyContactsTx(tx gdb.TX, userID uint64, contacts []verificationModel.ContactInput) error {
+	if _, err := tx.Model("company_contacts").Where("user_id", userID).Delete(); err != nil {
 		return gerror.Wrap(err, "clear company contacts")
 	}
 	for _, contact := range contacts {
-		if _, err := dao.CompanyContacts.Ctx(ctx).Data(g.Map{
+		if _, err := tx.Model("company_contacts").Data(g.Map{
 			"user_id": userID, "name": contact.Name, "position": contact.Position, "phone": contact.Phone,
 		}).Insert(); err != nil {
 			return gerror.Wrap(err, "create company contact")
@@ -715,19 +707,34 @@ func replaceCompanyContacts(ctx context.Context, userID uint64, contacts []verif
 
 func normalizeCompanyLocations(items []string) []string {
 	result := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
 	for _, item := range items {
 		item = strings.TrimSpace(item)
 		if item != "" {
+			if _, exists := seen[item]; exists {
+				continue
+			}
+			seen[item] = struct{}{}
 			result = append(result, item)
 		}
 	}
 	return result
 }
 
+func validateCompanyLocations(locations []string, field string) error {
+	for _, location := range locations {
+		if utf8.RuneCountInString(location) < 5 || utf8.RuneCountInString(location) > 500 {
+			return &consts.InvalidParameterError{Message: field + " entries must contain 5 to 500 characters"}
+		}
+	}
+	return nil
+}
+
 func validateCompanyContacts(contacts []verificationModel.ContactInput) error {
 	if len(contacts) == 0 || len(contacts) > 10 {
 		return &consts.InvalidParameterError{Message: "contacts must contain between 1 and 10 items"}
 	}
+	seenPhones := make(map[string]struct{}, len(contacts))
 	for _, contact := range contacts {
 		if utf8.RuneCountInString(contact.Name) < 2 || utf8.RuneCountInString(contact.Name) > 100 {
 			return &consts.InvalidParameterError{Message: "contact name must contain 2 to 100 characters"}
@@ -743,6 +750,10 @@ func validateCompanyContacts(contacts []verificationModel.ContactInput) error {
 				return &consts.InvalidParameterError{Message: "contact phone must contain digits only"}
 			}
 		}
+		if _, exists := seenPhones[contact.Phone]; exists {
+			return &consts.InvalidParameterError{Message: "contact phone cannot be duplicated"}
+		}
+		seenPhones[contact.Phone] = struct{}{}
 	}
 	return nil
 }
@@ -751,16 +762,30 @@ func validIDNumber(value string) bool {
 	if len(value) != 15 && len(value) != 18 {
 		return false
 	}
-	for index, char := range value {
-		if char >= '0' && char <= '9' {
-			continue
+	for index := 0; index < len(value); index++ {
+		if value[index] < '0' || value[index] > '9' {
+			if !(len(value) == 18 && index == 17 && value[index] == 'X') {
+				return false
+			}
 		}
-		if len(value) == 18 && index == len(value)-1 && char == 'X' {
-			continue
-		}
+	}
+	date := value[6:14]
+	if len(value) == 15 {
+		date = "19" + value[6:12]
+	}
+	if _, err := time.Parse("20060102", date); err != nil {
 		return false
 	}
-	return true
+	if len(value) == 15 {
+		return true
+	}
+	weights := [...]int{7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2}
+	checks := "10X98765432"
+	sum := 0
+	for index, weight := range weights {
+		sum += int(value[index]-'0') * weight
+	}
+	return value[17] == checks[sum%11]
 }
 
 func validateStoreURL(value string) error {

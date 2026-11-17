@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 
@@ -32,7 +33,7 @@ func (s *sAdminCustomerUsers) List(ctx context.Context, filter adminCustomerUser
 		return adminCustomerUserModel.ListResult{}, err
 	}
 	cols := dao.Users.Columns()
-	query := dao.Users.Ctx(ctx).Fields(cols.Id, cols.Phone, cols.Status, cols.Role, cols.UserType, cols.WechatOpenID, cols.CreatedAt, cols.UpdatedAt).OrderDesc(cols.CreatedAt)
+	query := dao.Users.Ctx(ctx).Fields(cols.Id, cols.Phone, cols.CompanyName, cols.Status, cols.Role, cols.UserType, cols.WechatOpenID, cols.CreatedAt, cols.UpdatedAt).OrderDesc(cols.CreatedAt)
 	if filter.Phone != "" {
 		query = query.WhereLike(cols.Phone, "%"+filter.Phone+"%")
 	}
@@ -84,8 +85,83 @@ func (s *sAdminCustomerUsers) UpdateStatus(ctx context.Context, id uint64, statu
 	} else if count == 0 {
 		return adminCustomerUserModel.UserItem{}, consts.ErrCustomerUserNotFound
 	}
-	if _, err := dao.Users.Ctx(ctx).Where(do.Users{Id: id}).Data(g.Map{"status": status}).Update(); err != nil {
+	if _, err := dao.Users.Ctx(ctx).Cache(gdb.CacheOption{}).Where(do.Users{Id: id}).Data(g.Map{"status": status}).Update(); err != nil {
 		return adminCustomerUserModel.UserItem{}, gerror.Wrap(err, "update customer user status")
+	}
+	result, err := s.List(ctx, adminCustomerUserModel.ListFilter{})
+	if err != nil {
+		return adminCustomerUserModel.UserItem{}, err
+	}
+	for _, item := range result.Items {
+		if uint64(item.ID) == id {
+			return item, nil
+		}
+	}
+	return adminCustomerUserModel.UserItem{}, consts.ErrCustomerUserNotFound
+}
+
+func (s *sAdminCustomerUsers) UpdateRole(ctx context.Context, id uint64, role uint8) (adminCustomerUserModel.UserItem, error) {
+	if id == 0 {
+		return adminCustomerUserModel.UserItem{}, &consts.InvalidParameterError{Message: "id is required"}
+	}
+	if role != 1 && role != 2 {
+		return adminCustomerUserModel.UserItem{}, &consts.InvalidParameterError{Message: "role must be 1 or 2"}
+	}
+	if err := switchCustomerRole(ctx, dao.Users.DB(), id, role); err != nil {
+		return adminCustomerUserModel.UserItem{}, err
+	}
+	return s.getByID(ctx, id)
+}
+
+func switchCustomerRole(ctx context.Context, db gdb.DB, id uint64, role uint8) error {
+	return db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		var current *entity.Users
+		if err := tx.Model("users").Fields("id", "role").Where("id", id).LockUpdate().Scan(&current); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return gerror.Wrap(err, "lock customer user for role switch")
+		}
+		if current == nil {
+			return consts.ErrCustomerUserNotFound
+		}
+		if uint8(current.Role) == role {
+			return nil
+		}
+		// A role switch invalidates the previous verification type. Keeping an
+		// approved company verification while changing to buyer (or vice versa)
+		// would leave the account permanently unable to submit the new type.
+		if role == 1 {
+			if _, err := tx.Model("company_contacts").Where("user_id", id).Delete(); err != nil {
+				return gerror.Wrap(err, "clear company contacts during role switch")
+			}
+			if _, err := tx.Model("company_profiles").Where("user_id", id).Delete(); err != nil {
+				return gerror.Wrap(err, "clear company profile during role switch")
+			}
+			if _, err := tx.Model("company_verifications").Where("user_id", id).Delete(); err != nil {
+				return gerror.Wrap(err, "clear company verification during role switch")
+			}
+		} else {
+			if _, err := tx.Model("personal_verifications").Where("user_id", id).Delete(); err != nil {
+				return gerror.Wrap(err, "clear personal verification during role switch")
+			}
+			if _, err := tx.Model("buyer_sales_channels").Where("user_id", id).Delete(); err != nil {
+				return gerror.Wrap(err, "clear buyer sales channels during role switch")
+			}
+		}
+		if _, err := tx.Model("users").Where("id", id).Data(g.Map{
+			// Leave status untouched: writing back a previously loaded status
+			// would undo a concurrent disable or verification decision.
+			"role": role, "user_type": role,
+		}).Update(); err != nil {
+			return gerror.Wrap(err, "update customer user role")
+		}
+		return nil
+	})
+}
+
+func (s *sAdminCustomerUsers) getByID(ctx context.Context, id uint64) (adminCustomerUserModel.UserItem, error) {
+	if count, err := dao.Users.Ctx(ctx).Where(do.Users{Id: id}).Count(); err != nil {
+		return adminCustomerUserModel.UserItem{}, gerror.Wrap(err, "query customer user")
+	} else if count == 0 {
+		return adminCustomerUserModel.UserItem{}, consts.ErrCustomerUserNotFound
 	}
 	result, err := s.List(ctx, adminCustomerUserModel.ListFilter{})
 	if err != nil {
@@ -165,7 +241,7 @@ func validateFilter(filter adminCustomerUserModel.ListFilter) error {
 
 func toItem(record *entity.Users) adminCustomerUserModel.UserItem {
 	return adminCustomerUserModel.UserItem{
-		ID: int64(record.Id), Phone: record.Phone, Role: uint8(record.Role), UserType: uint8(record.UserType), Status: uint8(record.Status),
+		ID: int64(record.Id), Phone: record.Phone, CompanyName: record.CompanyName, Role: uint8(record.Role), UserType: uint8(record.UserType), Status: uint8(record.Status),
 		WechatBound: strings.TrimSpace(record.WechatOpenID) != "", CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 	}
 }

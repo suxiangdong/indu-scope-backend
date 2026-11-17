@@ -16,7 +16,17 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 )
 
-// IssueUserToken creates a user JWT without an expiration time.
+// TokenTTL is shared by JWT expiry and the Redis-backed request session so a
+// token cannot outlive its server-side session. A multi-day lifetime avoids
+// invalidating a mini-program login while the user leaves the app idle.
+const TokenTTL = 7 * 24 * time.Hour
+
+// AdminTokenTTL matches the shared Redis session TTL. The server currently
+// uses one session TTL for both user and admin sessions, so keeping these
+// values aligned avoids retaining an unusable admin session after JWT expiry.
+const AdminTokenTTL = TokenTTL
+
+// IssueUserToken creates a short-lived user JWT.
 func IssueUserToken(ctx context.Context, user authmodel.User) (authmodel.AuthResult, error) {
 	secret, err := jwtSecret(ctx)
 	if err != nil {
@@ -27,10 +37,11 @@ func IssueUserToken(ctx context.Context, user authmodel.User) (authmodel.AuthRes
 
 func issueUserToken(secret []byte, user authmodel.User) (authmodel.AuthResult, error) {
 	claims := jwt.RegisteredClaims{
-		Issuer:   consts.UserTokenIssuer,
-		ID:       gsession.NewSessionId(),
-		Subject:  strconv.FormatInt(user.ID, 10),
-		IssuedAt: jwt.NewNumericDate(time.Now()),
+		Issuer:    consts.UserTokenIssuer,
+		ID:        gsession.NewSessionId(),
+		Subject:   strconv.FormatInt(user.ID, 10),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenTTL)),
 	}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(secret)
 	if err != nil {
@@ -39,17 +50,18 @@ func issueUserToken(secret []byte, user authmodel.User) (authmodel.AuthResult, e
 	return authmodel.AuthResult{AccessToken: token, User: user}, nil
 }
 
-// IssueAdminToken creates an administrator JWT without an expiration time.
+// IssueAdminToken creates a short-lived administrator JWT.
 func IssueAdminToken(ctx context.Context, user authmodel.AdminUser) (authmodel.AdminAuthResult, error) {
 	secret, err := jwtSecret(ctx)
 	if err != nil {
 		return authmodel.AdminAuthResult{}, err
 	}
 	claims := jwt.RegisteredClaims{
-		Issuer:   consts.AdminTokenIssuer,
-		ID:       gsession.NewSessionId(),
-		Subject:  strconv.FormatInt(user.ID, 10),
-		IssuedAt: jwt.NewNumericDate(time.Now()),
+		Issuer:    consts.AdminTokenIssuer,
+		ID:        gsession.NewSessionId(),
+		Subject:   strconv.FormatInt(user.ID, 10),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(AdminTokenTTL)),
 	}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(secret)
 	if err != nil {

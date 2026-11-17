@@ -47,6 +47,9 @@ type CompanyInfo struct {
 	BusinessLicenseContentType string
 	RegisteredAddress          string
 	Introduction               string
+	StorePlatformID            uint64
+	StorePlatformName          string
+	StoreURL                   string
 	Offices                    []string
 	Factories                  []string
 	Contacts                   []ContactInfo
@@ -85,6 +88,8 @@ type CompanyInput struct {
 	BusinessLicensePath     string
 	RegisteredAddress       string
 	Introduction            string
+	StorePlatformID         uint64
+	StoreURL                string
 	Offices                 []string
 	Factories               []string
 	Contacts                []ContactInput
@@ -108,6 +113,13 @@ type BusinessLicenseInfo struct {
 	Filename    string
 	ContentType string
 	Size        int64
+}
+
+// BusinessLicenseOCR contains safe fields returned by business-license OCR.
+type BusinessLicenseOCR struct {
+	CompanyName             string
+	UnifiedSocialCreditCode string
+	BusinessAddress         string
 }
 
 type IDCardUploadInput struct {

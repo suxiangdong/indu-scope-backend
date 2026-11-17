@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -44,8 +45,29 @@ var migrateDown = gcmd.Command{
 	},
 }
 
+var migrateForce = gcmd.Command{
+	Name:  "force",
+	Usage: "main migrate force --version=VERSION",
+	Brief: "repair dirty migration metadata after manual verification",
+	Func: func(ctx context.Context, parser *gcmd.Parser) error {
+		dsn, err := databaseDSN(ctx)
+		if err != nil {
+			return err
+		}
+		value := parser.GetOpt("version")
+		if value == nil || strings.TrimSpace(value.String()) == "" {
+			return gerror.New("--version is required")
+		}
+		version, err := strconv.Atoi(strings.TrimSpace(value.String()))
+		if err != nil || version < 0 {
+			return gerror.New("--version must be a non-negative integer")
+		}
+		return migration.Force(dsn, version)
+	},
+}
+
 func init() {
-	if err := Migrate.AddCommand(&migrateUp, &migrateDown); err != nil {
+	if err := Migrate.AddCommand(&migrateUp, &migrateDown, &migrateForce); err != nil {
 		panic(err)
 	}
 	if err := Main.AddCommand(&Migrate); err != nil {

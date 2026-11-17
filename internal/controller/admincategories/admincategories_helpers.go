@@ -33,7 +33,8 @@ func toAPIError(ctx context.Context, err error) error {
 		errors.Is(err, consts.ErrCategoryParentNotFound),
 		errors.Is(err, consts.ErrCategoryParentCycle),
 		errors.Is(err, consts.ErrCategoryHasChildren),
-		errors.Is(err, consts.ErrCategoryHasProducts):
+		errors.Is(err, consts.ErrCategoryHasProducts),
+		errors.Is(err, consts.ErrCategoryHasRequirements):
 		return gerror.NewCode(gcode.CodeBusinessValidationFailed, err.Error())
 	}
 	var parameterError *consts.InvalidParameterError
@@ -58,4 +59,8 @@ func statusValue(status *uint) uint {
 		return 1
 	}
 	return *status
+}
+
+func invalidRequest(message string) error {
+	return gerror.NewCode(gcode.CodeInvalidParameter, message)
 }

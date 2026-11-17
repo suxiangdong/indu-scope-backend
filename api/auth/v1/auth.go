@@ -19,11 +19,12 @@ type LoginReq struct {
 }
 
 type UserInfo struct {
-	ID       int64  `json:"id" dc:"User ID"`
-	Phone    string `json:"phone" dc:"Phone number"`
-	Role     uint8  `json:"role" dc:"0 pending selection, 1 buyer, 2 supplier"`
-	UserType uint8  `json:"user_type" dc:"1 personal, 2 company"`
-	Status   uint8  `json:"status" dc:"0 unverified, 1 verified, 2 disabled"`
+	ID          int64  `json:"id" dc:"User ID"`
+	Phone       string `json:"phone" dc:"Phone number"`
+	CompanyName string `json:"company_name" dc:"Company name"`
+	Role        uint8  `json:"role" dc:"0 pending selection, 1 buyer, 2 supplier"`
+	UserType    uint8  `json:"user_type" dc:"1 personal, 2 company"`
+	Status      uint8  `json:"status" dc:"0 unverified, 1 verified, 2 disabled"`
 }
 
 type AuthData struct {
@@ -122,6 +123,9 @@ type CompanyVerificationInfo struct {
 	BusinessLicenseContentType string               `json:"business_license_content_type,omitempty"`
 	RegisteredAddress          string               `json:"registered_address"`
 	Introduction               string               `json:"introduction,omitempty"`
+	StorePlatformID            uint64               `json:"store_platform_id,omitempty"`
+	StorePlatformName          string               `json:"store_platform_name,omitempty"`
+	StoreURL                   string               `json:"store_url,omitempty"`
 	Offices                    []string             `json:"offices"`
 	Factories                  []string             `json:"factories"`
 	Contacts                   []CompanyContactInfo `json:"contacts"`
@@ -176,6 +180,8 @@ type SubmitCompanyVerificationReq struct {
 	BusinessLicensePath     string               `json:"business_license_path" v:"required" dc:"Business license OSS path"`
 	RegisteredAddress       string               `json:"registered_address" v:"required" dc:"Registered address"`
 	Introduction            string               `json:"introduction" dc:"Company introduction"`
+	StorePlatformID         uint64               `json:"store_platform_id" dc:"Buyer store platform ID"`
+	StoreURL                string               `json:"store_url" dc:"Buyer store URL"`
 	Offices                 []string             `json:"offices" dc:"Office addresses"`
 	Factories               []string             `json:"factories" dc:"Factory addresses"`
 	Contacts                []CompanyContactInfo `json:"contacts" v:"required" dc:"Company contacts"`
@@ -203,6 +209,17 @@ type BusinessLicenseUploadInfo struct {
 type UploadBusinessLicenseRes struct {
 	g.Meta `mime:"application/json"`
 	BusinessLicenseUploadInfo
+}
+
+type RecognizeBusinessLicenseReq struct {
+	g.Meta `path:"/api/v1/auth/verification/business-license/ocr" tags:"Auth Verification" method:"post" summary:"Recognize business license"`
+}
+
+type RecognizeBusinessLicenseRes struct {
+	g.Meta                  `mime:"application/json"`
+	CompanyName             string `json:"company_name"`
+	UnifiedSocialCreditCode string `json:"unified_social_credit_code"`
+	BusinessAddress         string `json:"business_address"`
 }
 
 type UploadIDCardReq struct {

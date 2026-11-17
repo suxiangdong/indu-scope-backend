@@ -24,6 +24,8 @@ type CompanyProfilesColumns struct {
 	Id               string //
 	UserId           string //
 	IntroductionHtml string //
+	StorePlatformId  string //
+	StoreUrl         string //
 	Offices          string //
 	Factories        string //
 	CreatedAt        string //
@@ -35,6 +37,8 @@ var companyProfilesColumns = CompanyProfilesColumns{
 	Id:               "id",
 	UserId:           "user_id",
 	IntroductionHtml: "introduction_html",
+	StorePlatformId:  "store_platform_id",
+	StoreUrl:         "store_url",
 	Offices:          "offices",
 	Factories:        "factories",
 	CreatedAt:        "created_at",

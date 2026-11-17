@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -36,7 +37,45 @@ type Client struct {
 	client *http.Client
 }
 
+var ossHTTPClient = &http.Client{Timeout: 30 * time.Second}
+
+var (
+	ossClientOnce sync.Once
+	ossClient     *Client
+	ossClientErr  error
+)
+
+// InitOSSClient initializes the process-wide OSS client. Configuration is
+// loaded once during application startup and the same HTTP client/signing
+// configuration is reused by every request.
+func InitOSSClient(ctx context.Context) error {
+	ossClientOnce.Do(func() {
+		ossClient, ossClientErr = newOSSClient(ctx)
+	})
+	return ossClientErr
+}
+
+// OSSClient returns the initialized process-wide OSS client.
+func OSSClient() (*Client, error) {
+	if ossClientErr != nil {
+		return nil, ossClientErr
+	}
+	if ossClient == nil {
+		return nil, fmt.Errorf("oss client is not initialized")
+	}
+	return ossClient, nil
+}
+
+// NewOSSClient is kept as a compatibility wrapper for existing callers. It
+// now returns the singleton instead of constructing a client per request.
 func NewOSSClient(ctx context.Context) (*Client, error) {
+	if err := InitOSSClient(ctx); err != nil {
+		return nil, err
+	}
+	return OSSClient()
+}
+
+func newOSSClient(ctx context.Context) (*Client, error) {
 	config := OSSConfig{
 		Endpoint:        configValue(ctx, "oss.endpoint", "OSS_ENDPOINT"),
 		Bucket:          configValue(ctx, "oss.bucket", "OSS_BUCKET"),
@@ -59,7 +98,10 @@ func NewOSSClient(ctx context.Context) (*Client, error) {
 	if !strings.HasPrefix(config.Endpoint, "http://") && !strings.HasPrefix(config.Endpoint, "https://") {
 		config.Endpoint = "https://" + config.Endpoint
 	}
-	return &Client{config: config, client: &http.Client{Timeout: 30 * time.Second}}, nil
+	if strings.HasPrefix(strings.ToLower(config.Endpoint), "http://") {
+		return nil, fmt.Errorf("oss.endpoint must use HTTPS")
+	}
+	return &Client{config: config, client: ossHTTPClient}, nil
 }
 
 func (c *Client) Upload(ctx context.Context, objectKey string, reader io.Reader, size int64, contentType string) (string, error) {
@@ -108,6 +150,82 @@ func (c *Client) Upload(ctx context.Context, objectKey string, reader io.Reader,
 		return "", fmt.Errorf("oss upload failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return strings.Trim(resp.Header.Get("ETag"), `"`), nil
+}
+
+// Delete removes a private object. It is used to roll back an OSS upload when
+// the corresponding database metadata cannot be saved.
+func (c *Client) Delete(ctx context.Context, objectKey string) error {
+	return c.deleteObject(ctx, c.config.Endpoint, c.config.Bucket, objectKey)
+}
+
+// DeleteWithTimeout performs cleanup independently of a cancelled upload
+// request. It prevents a client disconnect from leaving a successfully
+// uploaded object behind forever.
+func DeleteWithTimeout(parent context.Context, client *Client, objectKey string) error {
+	if client == nil {
+		return fmt.Errorf("oss client is nil")
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return client.Delete(cleanupCtx, objectKey)
+}
+
+// DeleteFor removes an object from a historical endpoint and bucket recorded
+// with the file metadata. This keeps cleanup safe after an OSS migration.
+func (c *Client) DeleteFor(ctx context.Context, endpointHost, bucket, objectKey string) error {
+	return c.deleteObject(ctx, endpointHost, bucket, objectKey)
+}
+
+func (c *Client) deleteObject(ctx context.Context, endpointHost, bucket, objectKey string) error {
+	endpointHost = strings.TrimRight(strings.TrimSpace(endpointHost), "/")
+	bucket = strings.TrimSpace(bucket)
+	if endpointHost == "" || bucket == "" {
+		return fmt.Errorf("oss endpoint and bucket are required")
+	}
+	if !strings.HasPrefix(strings.ToLower(endpointHost), "http://") && !strings.HasPrefix(strings.ToLower(endpointHost), "https://") {
+		endpointHost = "https://" + endpointHost
+	}
+	if strings.HasPrefix(strings.ToLower(endpointHost), "http://") {
+		return fmt.Errorf("oss endpoint must use HTTPS")
+	}
+	endpoint, err := url.Parse(endpointHost)
+	if err != nil || endpoint.Host == "" {
+		return fmt.Errorf("oss endpoint is invalid")
+	}
+	key := strings.TrimLeft(objectKey, "/")
+	if key == "" {
+		return fmt.Errorf("oss object key is empty")
+	}
+	host := endpoint.Host
+	if !strings.HasPrefix(strings.ToLower(host), strings.ToLower(bucket)+".") {
+		host = bucket + "." + host
+	}
+	objectURL := (&url.URL{Scheme: endpoint.Scheme, Host: host, Path: "/" + key}).String()
+	canonicalResource := "/" + bucket + "/" + key
+	date := time.Now().UTC().Format(http.TimeFormat)
+	stringToSign := "DELETE\n\n\n" + date + "\n" + canonicalResource
+	mac := hmac.New(sha1.New, []byte(c.config.AccessKeySecret))
+	_, _ = mac.Write([]byte(stringToSign))
+	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, objectURL, nil)
+	if err != nil {
+		return fmt.Errorf("create oss delete request: %w", err)
+	}
+	req.Header.Set("Date", date)
+	req.Header.Set("Authorization", "OSS "+c.config.AccessKeyID+":"+signature)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("delete object from oss: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return fmt.Errorf("oss delete failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
 }
 
 func (c *Client) objectURL(objectKey string) (string, string, error) {
@@ -164,6 +282,9 @@ func (c *Client) SignedURLFor(endpointHost, bucket, objectKey string, lifetime t
 	}
 	if !strings.HasPrefix(endpointHost, "http://") && !strings.HasPrefix(endpointHost, "https://") {
 		endpointHost = "https://" + endpointHost
+	}
+	if strings.HasPrefix(strings.ToLower(endpointHost), "http://") {
+		return "", fmt.Errorf("oss endpoint must use HTTPS")
 	}
 	endpoint, err := url.Parse(strings.TrimRight(endpointHost, "/"))
 	if err != nil || endpoint.Host == "" {

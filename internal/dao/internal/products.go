@@ -21,36 +21,32 @@ type ProductsDao struct {
 
 // ProductsColumns defines and stores column names for the table products.
 type ProductsColumns struct {
-	Id              string //
-	SupplierUserId  string //
-	CategoryId      string //
-	Name            string //
-	DescriptionHtml string //
-	ConditionCode   string //
-	StockQuantity   string //
-	StockUnitCode   string //
-	StockUpdatedAt  string //
-	StockUpdatedBy  string //
-	Status          string //
-	CreatedAt       string //
-	UpdatedAt       string //
+	Id             string //
+	SupplierUserId string //
+	CategoryId     string //
+	Name           string //
+	StockUnitId    string //
+	StockQuantity  string //
+	StockUpdatedAt string //
+	StockUpdatedBy string //
+	Status         string //
+	CreatedAt      string //
+	UpdatedAt      string //
 }
 
 // productsColumns holds the columns for the table products.
 var productsColumns = ProductsColumns{
-	Id:              "id",
-	SupplierUserId:  "supplier_user_id",
-	CategoryId:      "category_id",
-	Name:            "name",
-	DescriptionHtml: "description_html",
-	ConditionCode:   "condition_code",
-	StockQuantity:   "stock_quantity",
-	StockUnitCode:   "stock_unit_code",
-	StockUpdatedAt:  "stock_updated_at",
-	StockUpdatedBy:  "stock_updated_by",
-	Status:          "status",
-	CreatedAt:       "created_at",
-	UpdatedAt:       "updated_at",
+	Id:             "id",
+	SupplierUserId: "supplier_user_id",
+	CategoryId:     "category_id",
+	Name:           "name",
+	StockUnitId:    "stock_unit_id",
+	StockQuantity:  "stock_quantity",
+	StockUpdatedAt: "stock_updated_at",
+	StockUpdatedBy: "stock_updated_by",
+	Status:         "status",
+	CreatedAt:      "created_at",
+	UpdatedAt:      "updated_at",
 }
 
 // NewProductsDao creates and returns a new DAO object for table data access.

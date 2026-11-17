@@ -1,0 +1,1 @@
+-- No-op: the plaintext identity-number column is retained.

@@ -27,6 +27,9 @@ func (c *ControllerV1) List(ctx context.Context, _ *v1.ListReq) (*v1.ListRes, er
 }
 
 func (c *ControllerV1) Create(ctx context.Context, req *v1.CreateReq) (*v1.CreateRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "store platform create request is required")
+	}
 	item, err := service.AdminStorePlatform().Create(ctx, storePlatformModel.Input{Name: req.Name, SortOrder: req.SortOrder, Status: statusValue(req.Status)})
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -35,6 +38,9 @@ func (c *ControllerV1) Create(ctx context.Context, req *v1.CreateReq) (*v1.Creat
 }
 
 func (c *ControllerV1) Update(ctx context.Context, req *v1.UpdateReq) (*v1.UpdateRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "store platform update request is required")
+	}
 	item, err := service.AdminStorePlatform().Update(ctx, req.ID, storePlatformModel.Input{Name: req.Name, SortOrder: req.SortOrder, Status: statusValue(req.Status)})
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -43,6 +49,9 @@ func (c *ControllerV1) Update(ctx context.Context, req *v1.UpdateReq) (*v1.Updat
 }
 
 func (c *ControllerV1) Delete(ctx context.Context, req *v1.DeleteReq) (*v1.DeleteRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "store platform delete request is required")
+	}
 	if err := service.AdminStorePlatform().Delete(ctx, req.ID); err != nil {
 		return nil, toAPIError(ctx, err)
 	}

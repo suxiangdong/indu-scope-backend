@@ -42,11 +42,12 @@ func (s *sSession) GetUser(ctx context.Context) (authmodel.User, error) {
 		return authmodel.User{}, consts.ErrTokenInvalid
 	}
 	return authmodel.User{
-		ID:       user.ID,
-		Phone:    user.Phone,
-		Role:     user.Role,
-		UserType: user.UserType,
-		Status:   user.Status,
+		ID:          user.ID,
+		Phone:       user.Phone,
+		CompanyName: user.CompanyName,
+		Role:        user.Role,
+		UserType:    user.UserType,
+		Status:      user.Status,
 	}, nil
 }
 
@@ -80,11 +81,12 @@ func (s *sSession) GetAdminUser(ctx context.Context) (authmodel.AdminUser, error
 		return authmodel.AdminUser{}, consts.ErrTokenInvalid
 	}
 	return authmodel.AdminUser{
-		ID:       user.ID,
-		Username: user.Username,
-		Name:     user.Name,
-		Phone:    user.Phone,
-		Status:   user.Status,
+		ID:           user.ID,
+		Username:     user.Username,
+		Name:         user.Name,
+		Phone:        user.Phone,
+		Status:       user.Status,
+		IsSuperAdmin: user.IsSuperAdmin,
 	}, nil
 }
 

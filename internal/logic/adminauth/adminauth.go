@@ -46,7 +46,7 @@ func (s *sAdminAuth) Login(ctx context.Context, identifier, password string) (au
 		cols   = dao.AdminUsers.Columns()
 	)
 	err := dao.AdminUsers.Ctx(ctx).
-		Fields(cols.Id, cols.Username, cols.Name, cols.Phone, cols.PasswordHash, cols.Status).
+		Fields(cols.Id, cols.Username, cols.Name, cols.Phone, cols.PasswordHash, cols.Status, cols.IsSuperAdmin).
 		Where(do.AdminUsers{Username: identifier}).
 		WhereOr(do.AdminUsers{Phone: identifier}).
 		Scan(&record)
@@ -70,7 +70,7 @@ func (s *sAdminAuth) Login(ctx context.Context, identifier, password string) (au
 	}
 	result, err := authutil.IssueAdminToken(ctx, authmodel.AdminUser{
 		ID: int64(record.Id), Username: record.Username, Name: record.Name,
-		Phone: record.Phone, Status: uint8(record.Status),
+		Phone: record.Phone, Status: uint8(record.Status), IsSuperAdmin: record.IsSuperAdmin == 1,
 	})
 	if err != nil {
 		return authmodel.AdminAuthResult{}, err
@@ -139,7 +139,7 @@ func (s *sAdminAuth) loadByID(ctx context.Context, id int64) (authmodel.AdminUse
 		cols   = dao.AdminUsers.Columns()
 	)
 	err := dao.AdminUsers.Ctx(ctx).
-		Fields(cols.Id, cols.Username, cols.Name, cols.Phone, cols.Status).
+		Fields(cols.Id, cols.Username, cols.Name, cols.Phone, cols.Status, cols.IsSuperAdmin).
 		Where(do.AdminUsers{Id: id}).
 		Scan(&record)
 	if errors.Is(err, sql.ErrNoRows) || record == nil {
@@ -153,7 +153,7 @@ func (s *sAdminAuth) loadByID(ctx context.Context, id int64) (authmodel.AdminUse
 	}
 	return authmodel.AdminUser{
 		ID: int64(record.Id), Username: record.Username, Name: record.Name,
-		Phone: record.Phone, Status: uint8(record.Status),
+		Phone: record.Phone, Status: uint8(record.Status), IsSuperAdmin: record.IsSuperAdmin == 1,
 	}, nil
 }
 

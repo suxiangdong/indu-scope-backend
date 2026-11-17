@@ -33,8 +33,18 @@ var Users = map[string]*gdb.TableField{
 		Extra:   "",
 		Comment: "",
 	},
-	"wechat_openid": {
+	"company_name": {
 		Index:   2,
+		Name:    "company_name",
+		Type:    "varchar(255)",
+		Null:    true,
+		Key:     "",
+		Default: nil,
+		Extra:   "",
+		Comment: "",
+	},
+	"wechat_openid": {
+		Index:   3,
 		Name:    "wechat_openid",
 		Type:    "varchar(64)",
 		Null:    true,
@@ -44,7 +54,7 @@ var Users = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"password_hash": {
-		Index:   3,
+		Index:   4,
 		Name:    "password_hash",
 		Type:    "varchar(255)",
 		Null:    false,
@@ -54,7 +64,7 @@ var Users = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"status": {
-		Index:   4,
+		Index:   5,
 		Name:    "status",
 		Type:    "tinyint unsigned",
 		Null:    false,
@@ -64,7 +74,7 @@ var Users = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"role": {
-		Index:   5,
+		Index:   6,
 		Name:    "role",
 		Type:    "tinyint unsigned",
 		Null:    false,
@@ -74,7 +84,7 @@ var Users = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"user_type": {
-		Index:   6,
+		Index:   7,
 		Name:    "user_type",
 		Type:    "tinyint unsigned",
 		Null:    false,
@@ -84,7 +94,7 @@ var Users = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"created_at": {
-		Index:   7,
+		Index:   8,
 		Name:    "created_at",
 		Type:    "datetime(3)",
 		Null:    false,
@@ -94,7 +104,7 @@ var Users = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"updated_at": {
-		Index:   8,
+		Index:   9,
 		Name:    "updated_at",
 		Type:    "datetime(3)",
 		Null:    false,

@@ -9,6 +9,7 @@ import (
 type IAdminCustomerUsers interface {
 	List(ctx context.Context, filter adminCustomerUserModel.ListFilter) (adminCustomerUserModel.ListResult, error)
 	UpdateStatus(ctx context.Context, id uint64, status uint8) (adminCustomerUserModel.UserItem, error)
+	UpdateRole(ctx context.Context, id uint64, role uint8) (adminCustomerUserModel.UserItem, error)
 }
 
 var localAdminCustomerUsers IAdminCustomerUsers

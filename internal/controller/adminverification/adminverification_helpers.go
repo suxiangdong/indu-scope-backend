@@ -20,7 +20,7 @@ func toAPIListItem(item adminverificationmodel.ListItem) v1.VerificationListItem
 }
 
 func toAPIDetail(detail adminverificationmodel.Detail) v1.DetailInfo {
-	result := v1.DetailInfo{VerificationListItem: toAPIListItem(detail.ListItem), UserStatus: detail.UserStatus}
+	result := v1.DetailInfo{VerificationListItem: toAPIListItem(detail.ListItem), UserStatus: detail.UserStatus, Role: detail.Role}
 	if detail.Personal != nil {
 		result.Personal = &v1.PersonalDetail{RealName: detail.Personal.RealName, IDNumberMasked: detail.Personal.IDNumberMasked,
 			StorePlatformID: detail.Personal.StorePlatformID, StorePlatformName: detail.Personal.StorePlatformName, StoreURL: detail.Personal.StoreURL,
@@ -38,7 +38,9 @@ func toAPIDetail(detail adminverificationmodel.Detail) v1.DetailInfo {
 			BusinessLicensePath: detail.Company.BusinessLicensePath, BusinessLicenseURL: detail.Company.BusinessLicenseURL,
 			BusinessLicenseFileName: detail.Company.BusinessLicenseFileName, BusinessLicenseFileSize: detail.Company.BusinessLicenseFileSize,
 			BusinessLicenseContentType: detail.Company.BusinessLicenseContentType, RegisteredAddress: detail.Company.RegisteredAddress,
-			Introduction: detail.Company.Introduction, Offices: detail.Company.Offices, Factories: detail.Company.Factories,
+			Introduction: detail.Company.Introduction, StorePlatformID: detail.Company.StorePlatformID,
+			StorePlatformName: detail.Company.StorePlatformName, StoreURL: detail.Company.StoreURL,
+			Offices: detail.Company.Offices, Factories: detail.Company.Factories,
 			Contacts: contacts, VerifiedAt: detail.Company.VerifiedAt}
 	}
 	return result
@@ -46,7 +48,8 @@ func toAPIDetail(detail adminverificationmodel.Detail) v1.DetailInfo {
 
 func toAPIError(ctx context.Context, err error) error {
 	switch {
-	case errors.Is(err, consts.ErrVerificationNotFound), errors.Is(err, consts.ErrVerificationAlreadyReviewed):
+	case errors.Is(err, consts.ErrVerificationNotFound), errors.Is(err, consts.ErrVerificationAlreadyReviewed),
+		errors.Is(err, consts.ErrUserDisabled), errors.Is(err, consts.ErrVerificationTypeConflict):
 		return gerror.NewCode(gcode.CodeBusinessValidationFailed, err.Error())
 	}
 	var parameterError *consts.InvalidParameterError

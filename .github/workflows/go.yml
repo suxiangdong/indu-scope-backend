@@ -1,0 +1,51 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  prod-task:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.5'
+
+      - name: Build
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o indu-backend -ldflags="-s -w" main.go
+
+      - name: Save private key to file
+        run: |
+          echo "${{ secrets.ALIYUN_ECS }}" > /tmp/ecs_ssh_key
+          chmod 600 /tmp/ecs_ssh_key
+      - name: Add ECS server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H 182.92.156.58 >> ~/.ssh/known_hosts
+
+      - name: Upload to ECS server using SCP
+        run: |
+          scp -i /tmp/ecs_ssh_key ./indu-backend ecs-user@182.92.156.58:~
+
+      - name: Run deploy script on ECS
+        run: |
+          ssh -i /tmp/ecs_ssh_key ecs-user@182.92.156.58 << 'EOF'
+            set -e
+            echo "触发部署脚本..."
+            cd /data/deploy/indu
+            sudo ./deploy.sh
+          
+            echo "部署完成"
+          EOF
+      - name: Clean up
+        run: |
+          rm -rf /tmp/ecs_ssh_key
+          rm -rf indu-backend

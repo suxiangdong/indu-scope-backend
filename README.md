@@ -29,6 +29,8 @@ JWT 密钥至少需要 32 个字符；真实配置文件不会提交到 Git。
 
 默认服务地址为 `http://127.0.0.1:8000`。
 
+生产环境可在 `server.swagger_enabled` 设置为 `false`，同时关闭 Swagger UI 和 `/api.json` OpenAPI 文档；开发环境保持为 `true` 即可。
+
 换电脑时请先阅读 [`docs/development-onboarding.md`](docs/development-onboarding.md)，其中包含三个仓库的克隆方式、MySQL/Redis 配置、迁移、Taro 小程序、微信开发者工具和管理后台的完整启动顺序。
 
 ## 项目结构
@@ -94,11 +96,16 @@ go run . migrate up
 ```bash
 go run . migrate up    # 执行所有待执行迁移
 go run . migrate down  # 回滚最近一次迁移
+go run . migrate force --version=28  # 仅在确认 dirty 迁移未完成后修复版本元数据
 ```
+
+如果迁移执行失败并提示 `dirty`，先确认失败迁移的 DDL 是否已经生效，再将版本强制回退到失败迁移的前一个版本，然后重新执行 `migrate up`。`force` 只修改迁移元数据，不会执行或回滚业务 SQL。
 
 迁移版本按编号递增。已经执行过的迁移不要修改，后续结构变化请新增一组 `.up.sql` 和 `.down.sql` 文件。当前迁移包含用户认证、公司资料、采购方销售渠道、多级类目、通用产品属性、产品库存和管理后台管理员账号。迁移 `000018_allow_pending_user_role` 允许新用户暂时使用 `role=0`，完成资料后再选择业务角色。
 
 类目表使用 `parent_id = 0` 表示一级类目；迁移 `000006_categories_use_zero_parent` 会将历史 `NULL` 值转换为 `0`，并将字段改为非空且默认值为 `0`。迁移 `000007_create_category_attribute_groups` 先保存了类目级分组，迁移 `000008_normalize_attribute_groups` 再将其转换为可复用的全局分组、属性关系和类目分组绑定；迁移 `000009_add_ids_to_all_tables` 为此前使用用户主键或联合主键的业务表补充统一的自增 `id` 主键，并保留原有业务唯一约束；迁移 `000010_add_attribute_group_display_name` 为分组增加面向前端展示的显示名称。
+
+迁移 `000045_serialize_category_tree_writes` 新增 `backend_write_locks` 并预置分类树锁记录。分类新增、移动和删除在同一事务内取得该记录的行锁后，再检查父节点、祖先链和同级名称，防止多实例并发操作产生循环或孤立节点。部署包含此修复的版本前，先执行 `go run . migrate up`。
 
 ## 认证接口
 
@@ -111,6 +118,7 @@ POST /api/v1/auth/wechat/phone-login   微信手机号组件登录
 GET  /api/v1/auth/verification        获取当前认证状态
 GET  /api/v1/auth/verification/store-platforms  获取启用的店铺平台
 POST /api/v1/auth/verification/business-license  上传营业执照到 OSS
+POST /api/v1/auth/verification/business-license/ocr  识别已上传的营业执照
 POST /api/v1/auth/verification/id-card  上传身份证正面或反面到 OSS（`side=front|back`）
 POST /api/v1/auth/verification/personal  提交个人认证
 POST /api/v1/auth/verification/company   提交企业认证
@@ -153,6 +161,12 @@ OSS 私有桶保存对象，并在 `user_files` 中保存 Endpoint、bucket、�
 当前 OSS 地域为华北 2（北京），Endpoint 为 `https://oss-cn-beijing.aliyuncs.com`；开发环境
 使用 `env-develop`，生产环境使用 `env-production`。部署生产环境时设置
 `OSS_BUCKET=env-production` 覆盖开发配置。
+
+营业执照上传成功后，调用 `POST /api/v1/auth/verification/business-license/ocr` 可使用阿里云
+`RecognizeBusinessLicense` 识别企业名称、统一社会信用代码和营业地址。接口复用已有的
+`OSS_ACCESS_KEY_ID`/`OSS_ACCESS_KEY_SECRET`（或 `oss.access_key_id`/`oss.access_key_secret`）配置，
+后端会为私有 OSS 对象生成临时签名 URL；小程序不会接触 AccessKey。OCR 默认使用
+`ocr-api.cn-hangzhou.aliyuncs.com`，如需切换地域可设置 `OCR_ENDPOINT` 或 `ocr.endpoint`。
 
 管理后台认证审核接口前缀为 `/api/v1/admin/verifications`，需要管理员 Bearer Token：
 

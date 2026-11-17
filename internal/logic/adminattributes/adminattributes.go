@@ -12,6 +12,7 @@ import (
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 
@@ -78,26 +79,20 @@ func (s *sAdminAttributes) Create(ctx context.Context, input attributeModel.Attr
 	if err := validateAttributeInput(input); err != nil {
 		return attributeModel.AttributeItem{}, err
 	}
-	if err := s.validateGroupIDs(ctx, input.GroupIDs); err != nil {
-		return attributeModel.AttributeItem{}, err
-	}
 	code, err := generateCode("attr")
 	if err != nil {
 		return attributeModel.AttributeItem{}, gerror.Wrap(err, "generate attribute code")
 	}
-	id, err := dao.Attributes.Ctx(ctx).Data(attributeData(input, code)).InsertAndGetId()
+	var id uint64
+	err = dao.Attributes.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		var err error
+		id, err = createAttributeTx(ctx, tx, input, code)
+		return err
+	})
 	if err != nil {
-		if isDuplicateKey(err) {
-			return attributeModel.AttributeItem{}, consts.ErrAttributeAlreadyExists
-		}
-		return attributeModel.AttributeItem{}, gerror.Wrap(err, "create attribute")
-	}
-	attributeID := uint64(id)
-	if err := s.syncAttributeGroups(ctx, attributeID, input.GroupIDs); err != nil {
-		_, _ = dao.Attributes.Ctx(ctx).Where(do.Attributes{Id: attributeID}).Delete()
 		return attributeModel.AttributeItem{}, err
 	}
-	return s.loadAttribute(ctx, attributeID)
+	return s.loadAttribute(ctx, id)
 }
 
 func (s *sAdminAttributes) Update(ctx context.Context, id uint64, input attributeModel.AttributeInput) (attributeModel.AttributeItem, error) {
@@ -108,31 +103,15 @@ func (s *sAdminAttributes) Update(ctx context.Context, id uint64, input attribut
 	if err := validateAttributeInput(input); err != nil {
 		return attributeModel.AttributeItem{}, err
 	}
-	if input.GroupIDs != nil {
-		if err := s.validateGroupIDs(ctx, input.GroupIDs); err != nil {
-			return attributeModel.AttributeItem{}, err
-		}
-	}
-	if count, err := dao.Attributes.Ctx(ctx).Where(do.Attributes{Id: id}).Count(); err != nil {
-		return attributeModel.AttributeItem{}, gerror.Wrap(err, "query attribute")
-	} else if count == 0 {
-		return attributeModel.AttributeItem{}, consts.ErrAttributeNotFound
-	}
-	if _, err := dao.Attributes.Ctx(ctx).Where(do.Attributes{Id: id}).Data(attributeData(input, "")).Update(); err != nil {
-		if isDuplicateKey(err) {
-			return attributeModel.AttributeItem{}, consts.ErrAttributeAlreadyExists
-		}
-		return attributeModel.AttributeItem{}, gerror.Wrap(err, "update attribute")
-	}
-	if input.GroupIDs != nil {
-		if err := s.syncAttributeGroups(ctx, id, input.GroupIDs); err != nil {
-			return attributeModel.AttributeItem{}, err
-		}
+	if err := dao.Attributes.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		return updateAttributeTx(ctx, tx, id, input)
+	}); err != nil {
+		return attributeModel.AttributeItem{}, err
 	}
 	return s.loadAttribute(ctx, id)
 }
 
-func (s *sAdminAttributes) Delete(ctx context.Context, id uint64) error {
+func (s *sAdminAttributes) deleteAttribute(ctx context.Context, id uint64) error {
 	if id == 0 {
 		return &consts.InvalidParameterError{Message: "id is required"}
 	}
@@ -618,7 +597,7 @@ func (s *sAdminAttributes) CreateGroup(ctx context.Context, input attributeModel
 	return s.loadAttributeGroup(ctx, uint64(id))
 }
 
-func (s *sAdminAttributes) UpdateGroup(ctx context.Context, id uint64, input attributeModel.AttributeGroupInput) (attributeModel.AttributeGroupItem, error) {
+func (s *sAdminAttributes) updateGroup(ctx context.Context, id uint64, input attributeModel.AttributeGroupInput) (attributeModel.AttributeGroupItem, error) {
 	if id == 0 {
 		return attributeModel.AttributeGroupItem{}, &consts.InvalidParameterError{Message: "id is required"}
 	}
@@ -647,7 +626,7 @@ func (s *sAdminAttributes) UpdateGroup(ctx context.Context, id uint64, input att
 	return s.loadAttributeGroup(ctx, id)
 }
 
-func (s *sAdminAttributes) DeleteGroup(ctx context.Context, id uint64) error {
+func (s *sAdminAttributes) deleteGroup(ctx context.Context, id uint64) error {
 	if id == 0 {
 		return &consts.InvalidParameterError{Message: "id is required"}
 	}
@@ -711,7 +690,7 @@ func (s *sAdminAttributes) ListGroupAttributes(ctx context.Context, groupID uint
 	return attributeModel.AttributeGroupAttributeListResult{Items: items}, nil
 }
 
-func (s *sAdminAttributes) SaveGroupAttribute(ctx context.Context, input attributeModel.AttributeGroupAttributeInput) (attributeModel.AttributeGroupAttributeItem, error) {
+func (s *sAdminAttributes) saveGroupAttribute(ctx context.Context, input attributeModel.AttributeGroupAttributeInput) (attributeModel.AttributeGroupAttributeItem, error) {
 	if input.GroupID == 0 || input.AttributeID == 0 {
 		return attributeModel.AttributeGroupAttributeItem{}, &consts.InvalidParameterError{Message: "group_id and attribute_id are required"}
 	}
@@ -739,7 +718,7 @@ func (s *sAdminAttributes) SaveGroupAttribute(ctx context.Context, input attribu
 	return attributeModel.AttributeGroupAttributeItem{}, consts.ErrAttributeNotFound
 }
 
-func (s *sAdminAttributes) DeleteGroupAttribute(ctx context.Context, groupID, attributeID uint64) error {
+func (s *sAdminAttributes) deleteGroupAttribute(ctx context.Context, groupID, attributeID uint64) error {
 	if groupID == 0 || attributeID == 0 {
 		return &consts.InvalidParameterError{Message: "group_id and attribute_id are required"}
 	}
@@ -829,7 +808,7 @@ func (s *sAdminAttributes) ListGroupCategories(ctx context.Context, groupID uint
 	return attributeModel.CategoryGroupBindingListResult{Items: items}, nil
 }
 
-func (s *sAdminAttributes) BindCategoryGroup(ctx context.Context, input attributeModel.CategoryGroupBindingInput) (attributeModel.CategoryGroupBindingItem, error) {
+func (s *sAdminAttributes) bindCategoryGroup(ctx context.Context, input attributeModel.CategoryGroupBindingInput) (attributeModel.CategoryGroupBindingItem, error) {
 	if input.CategoryID == 0 || input.GroupID == 0 {
 		return attributeModel.CategoryGroupBindingItem{}, &consts.InvalidParameterError{Message: "category_id and group_id are required"}
 	}
@@ -873,7 +852,7 @@ func (s *sAdminAttributes) BindCategoryGroup(ctx context.Context, input attribut
 	return attributeModel.CategoryGroupBindingItem{}, consts.ErrAttributeGroupNotFound
 }
 
-func (s *sAdminAttributes) UnbindCategoryGroup(ctx context.Context, categoryID, groupID uint64) error {
+func (s *sAdminAttributes) unbindCategoryGroup(ctx context.Context, categoryID, groupID uint64) error {
 	if categoryID == 0 || groupID == 0 {
 		return &consts.InvalidParameterError{Message: "category_id and group_id are required"}
 	}
@@ -1124,58 +1103,6 @@ func nullableString(value string) any {
 		return nil
 	}
 	return value
-}
-
-func (s *sAdminAttributes) validateGroupIDs(ctx context.Context, groupIDs []uint64) error {
-	seen := make(map[uint64]struct{}, len(groupIDs))
-	for _, groupID := range groupIDs {
-		if groupID == 0 {
-			return &consts.InvalidParameterError{Message: "group_ids must contain positive IDs"}
-		}
-		if _, ok := seen[groupID]; ok {
-			return &consts.InvalidParameterError{Message: "group_ids must not contain duplicates"}
-		}
-		seen[groupID] = struct{}{}
-		if err := s.ensureAttributeGroupExists(ctx, groupID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *sAdminAttributes) syncAttributeGroups(ctx context.Context, attributeID uint64, groupIDs []uint64) error {
-	currentGroupIDs, err := s.listAttributeGroupIDs(ctx, attributeID)
-	if err != nil {
-		return err
-	}
-	requested := make(map[uint64]struct{}, len(groupIDs))
-	for _, groupID := range groupIDs {
-		requested[groupID] = struct{}{}
-	}
-	for _, groupID := range currentGroupIDs {
-		if _, keep := requested[groupID]; keep {
-			continue
-		}
-		count, err := dao.CategoryAttributeGroupBindings.Ctx(ctx).
-			Where(do.CategoryAttributeGroupBindings{GroupId: groupID}).Count()
-		if err != nil {
-			return gerror.Wrap(err, "check removed attribute group bindings")
-		}
-		if count > 0 {
-			return consts.ErrAttributeGroupInUse
-		}
-	}
-	if _, err := dao.AttributeGroupAttributes.Ctx(ctx).Where(do.AttributeGroupAttributes{AttributeId: attributeID}).Delete(); err != nil {
-		return gerror.Wrap(err, "clear attribute groups")
-	}
-	for index, groupID := range groupIDs {
-		if _, err := dao.AttributeGroupAttributes.Ctx(ctx).Data(g.Map{
-			"group_id": groupID, "attribute_id": attributeID, "sort_order": index,
-		}).Insert(); err != nil {
-			return gerror.Wrap(err, "save attribute group")
-		}
-	}
-	return nil
 }
 
 func (s *sAdminAttributes) listAttributeGroupIDs(ctx context.Context, attributeID uint64) ([]uint64, error) {

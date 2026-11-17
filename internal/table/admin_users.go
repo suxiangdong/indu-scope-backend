@@ -73,8 +73,18 @@ var AdminUsers = map[string]*gdb.TableField{
 		Extra:   "",
 		Comment: "",
 	},
-	"last_login_at": {
+	"is_super_admin": {
 		Index:   6,
+		Name:    "is_super_admin",
+		Type:    "tinyint unsigned",
+		Null:    false,
+		Key:     "",
+		Default: "0",
+		Extra:   "",
+		Comment: "",
+	},
+	"last_login_at": {
+		Index:   7,
 		Name:    "last_login_at",
 		Type:    "datetime(3)",
 		Null:    true,
@@ -84,7 +94,7 @@ var AdminUsers = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"created_at": {
-		Index:   7,
+		Index:   8,
 		Name:    "created_at",
 		Type:    "datetime(3)",
 		Null:    false,
@@ -94,7 +104,7 @@ var AdminUsers = map[string]*gdb.TableField{
 		Comment: "",
 	},
 	"updated_at": {
-		Index:   8,
+		Index:   9,
 		Name:    "updated_at",
 		Type:    "datetime(3)",
 		Null:    false,

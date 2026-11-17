@@ -22,6 +22,9 @@ func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (*v1.ListRes, 
 }
 
 func (c *ControllerV1) Create(ctx context.Context, req *v1.CreateReq) (*v1.CreateRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute create request is required")
+	}
 	item, err := service.AdminAttributes().Create(ctx, attribute.AttributeInput{
 		Name: req.Name, ValueType: req.ValueType, InputType: req.InputType,
 		Unit: req.Unit, Placeholder: req.Placeholder, ValidationRules: req.ValidationRules,
@@ -34,6 +37,9 @@ func (c *ControllerV1) Create(ctx context.Context, req *v1.CreateReq) (*v1.Creat
 }
 
 func (c *ControllerV1) Update(ctx context.Context, req *v1.UpdateReq) (*v1.UpdateRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute update request is required")
+	}
 	item, err := service.AdminAttributes().Update(ctx, req.ID, attribute.AttributeInput{
 		Name: req.Name, ValueType: req.ValueType, InputType: req.InputType,
 		Unit: req.Unit, Placeholder: req.Placeholder, ValidationRules: req.ValidationRules,
@@ -46,6 +52,9 @@ func (c *ControllerV1) Update(ctx context.Context, req *v1.UpdateReq) (*v1.Updat
 }
 
 func (c *ControllerV1) Delete(ctx context.Context, req *v1.DeleteReq) (*v1.DeleteRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute delete request is required")
+	}
 	if err := service.AdminAttributes().Delete(ctx, req.ID); err != nil {
 		return nil, toAPIError(ctx, err)
 	}
@@ -53,6 +62,9 @@ func (c *ControllerV1) Delete(ctx context.Context, req *v1.DeleteReq) (*v1.Delet
 }
 
 func (c *ControllerV1) ListOptions(ctx context.Context, req *v1.ListOptionsReq) (*v1.ListOptionsRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute option list request is required")
+	}
 	result, err := service.AdminAttributes().ListOptions(ctx, req.AttributeID)
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -65,6 +77,9 @@ func (c *ControllerV1) ListOptions(ctx context.Context, req *v1.ListOptionsReq) 
 }
 
 func (c *ControllerV1) CreateOption(ctx context.Context, req *v1.CreateOptionReq) (*v1.CreateOptionRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute option create request is required")
+	}
 	item, err := service.AdminAttributes().CreateOption(ctx, req.AttributeID, attribute.AttributeOptionInput{
 		Name: req.Name, SortOrder: req.SortOrder, Status: statusValue(req.Status),
 	})
@@ -75,6 +90,9 @@ func (c *ControllerV1) CreateOption(ctx context.Context, req *v1.CreateOptionReq
 }
 
 func (c *ControllerV1) UpdateOption(ctx context.Context, req *v1.UpdateOptionReq) (*v1.UpdateOptionRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute option update request is required")
+	}
 	item, err := service.AdminAttributes().UpdateOption(ctx, req.ID, attribute.AttributeOptionInput{
 		Name: req.Name, SortOrder: req.SortOrder, Status: statusValue(req.Status),
 	})
@@ -85,6 +103,9 @@ func (c *ControllerV1) UpdateOption(ctx context.Context, req *v1.UpdateOptionReq
 }
 
 func (c *ControllerV1) DeleteOption(ctx context.Context, req *v1.DeleteOptionReq) (*v1.DeleteOptionRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute option delete request is required")
+	}
 	if err := service.AdminAttributes().DeleteOption(ctx, req.ID); err != nil {
 		return nil, toAPIError(ctx, err)
 	}
@@ -92,6 +113,9 @@ func (c *ControllerV1) DeleteOption(ctx context.Context, req *v1.DeleteOptionReq
 }
 
 func (c *ControllerV1) ListCategoryBindings(ctx context.Context, req *v1.ListCategoryBindingsReq) (*v1.ListCategoryBindingsRes, error) {
+	if req == nil {
+		return nil, invalidRequest("category attribute list request is required")
+	}
 	result, err := service.AdminAttributes().ListCategoryBindings(ctx, req.CategoryID, req.AttributeID)
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -104,6 +128,9 @@ func (c *ControllerV1) ListCategoryBindings(ctx context.Context, req *v1.ListCat
 }
 
 func (c *ControllerV1) SaveCategoryBinding(ctx context.Context, req *v1.SaveCategoryBindingReq) (*v1.SaveCategoryBindingRes, error) {
+	if req == nil {
+		return nil, invalidRequest("category attribute save request is required")
+	}
 	item, err := service.AdminAttributes().SaveCategoryBinding(ctx, attribute.CategoryAttributeInput{
 		CategoryID: req.CategoryID, AttributeID: req.AttributeID,
 		GroupID: req.GroupID, GroupName: req.GroupName,
@@ -117,6 +144,9 @@ func (c *ControllerV1) SaveCategoryBinding(ctx context.Context, req *v1.SaveCate
 }
 
 func (c *ControllerV1) DeleteCategoryBinding(ctx context.Context, req *v1.DeleteCategoryBindingReq) (*v1.DeleteCategoryBindingRes, error) {
+	if req == nil {
+		return nil, invalidRequest("category attribute delete request is required")
+	}
 	if err := service.AdminAttributes().DeleteCategoryBinding(ctx, req.CategoryID, req.AttributeID); err != nil {
 		return nil, toAPIError(ctx, err)
 	}
@@ -136,6 +166,9 @@ func (c *ControllerV1) ListGroups(ctx context.Context, req *v1.ListGroupsReq) (*
 }
 
 func (c *ControllerV1) CreateGroup(ctx context.Context, req *v1.CreateGroupReq) (*v1.CreateGroupRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute group create request is required")
+	}
 	item, err := service.AdminAttributes().CreateGroup(ctx, attribute.AttributeGroupInput{
 		Name: req.Name, DisplayName: req.DisplayName,
 		SortOrder: req.SortOrder, Status: statusValue(req.Status),
@@ -147,6 +180,9 @@ func (c *ControllerV1) CreateGroup(ctx context.Context, req *v1.CreateGroupReq) 
 }
 
 func (c *ControllerV1) UpdateGroup(ctx context.Context, req *v1.UpdateGroupReq) (*v1.UpdateGroupRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute group update request is required")
+	}
 	item, err := service.AdminAttributes().UpdateGroup(ctx, req.ID, attribute.AttributeGroupInput{
 		Name: req.Name, DisplayName: req.DisplayName,
 		SortOrder: req.SortOrder, Status: statusValue(req.Status),
@@ -158,6 +194,9 @@ func (c *ControllerV1) UpdateGroup(ctx context.Context, req *v1.UpdateGroupReq) 
 }
 
 func (c *ControllerV1) DeleteGroup(ctx context.Context, req *v1.DeleteGroupReq) (*v1.DeleteGroupRes, error) {
+	if req == nil {
+		return nil, invalidRequest("attribute group delete request is required")
+	}
 	if err := service.AdminAttributes().DeleteGroup(ctx, req.ID); err != nil {
 		return nil, toAPIError(ctx, err)
 	}
@@ -165,6 +204,9 @@ func (c *ControllerV1) DeleteGroup(ctx context.Context, req *v1.DeleteGroupReq) 
 }
 
 func (c *ControllerV1) ListGroupAttributes(ctx context.Context, req *v1.ListGroupAttributesReq) (*v1.ListGroupAttributesRes, error) {
+	if req == nil {
+		return nil, invalidRequest("group attribute list request is required")
+	}
 	result, err := service.AdminAttributes().ListGroupAttributes(ctx, req.GroupID)
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -177,6 +219,9 @@ func (c *ControllerV1) ListGroupAttributes(ctx context.Context, req *v1.ListGrou
 }
 
 func (c *ControllerV1) SaveGroupAttribute(ctx context.Context, req *v1.SaveGroupAttributeReq) (*v1.SaveGroupAttributeRes, error) {
+	if req == nil {
+		return nil, invalidRequest("group attribute save request is required")
+	}
 	item, err := service.AdminAttributes().SaveGroupAttribute(ctx, attribute.AttributeGroupAttributeInput{
 		GroupID: req.GroupID, AttributeID: req.AttributeID, SortOrder: req.SortOrder,
 	})
@@ -187,6 +232,9 @@ func (c *ControllerV1) SaveGroupAttribute(ctx context.Context, req *v1.SaveGroup
 }
 
 func (c *ControllerV1) DeleteGroupAttribute(ctx context.Context, req *v1.DeleteGroupAttributeReq) (*v1.DeleteGroupAttributeRes, error) {
+	if req == nil {
+		return nil, invalidRequest("group attribute delete request is required")
+	}
 	if err := service.AdminAttributes().DeleteGroupAttribute(ctx, req.GroupID, req.AttributeID); err != nil {
 		return nil, toAPIError(ctx, err)
 	}
@@ -194,6 +242,9 @@ func (c *ControllerV1) DeleteGroupAttribute(ctx context.Context, req *v1.DeleteG
 }
 
 func (c *ControllerV1) ListCategoryGroups(ctx context.Context, req *v1.ListCategoryGroupsReq) (*v1.ListCategoryGroupsRes, error) {
+	if req == nil {
+		return nil, invalidRequest("category group list request is required")
+	}
 	if req.CategoryID == 0 && req.GroupID == 0 {
 		return nil, toAPIError(ctx, &consts.InvalidParameterError{Message: "category_id or group_id is required"})
 	}
@@ -217,6 +268,9 @@ func (c *ControllerV1) ListCategoryGroups(ctx context.Context, req *v1.ListCateg
 }
 
 func (c *ControllerV1) BindCategoryGroup(ctx context.Context, req *v1.BindCategoryGroupReq) (*v1.BindCategoryGroupRes, error) {
+	if req == nil {
+		return nil, invalidRequest("category group bind request is required")
+	}
 	item, err := service.AdminAttributes().BindCategoryGroup(ctx, attribute.CategoryGroupBindingInput{
 		CategoryID: req.CategoryID, GroupID: req.GroupID, SortOrder: req.SortOrder, Status: statusValue(req.Status),
 	})
@@ -227,6 +281,9 @@ func (c *ControllerV1) BindCategoryGroup(ctx context.Context, req *v1.BindCatego
 }
 
 func (c *ControllerV1) UnbindCategoryGroup(ctx context.Context, req *v1.UnbindCategoryGroupReq) (*v1.UnbindCategoryGroupRes, error) {
+	if req == nil {
+		return nil, invalidRequest("category group unbind request is required")
+	}
 	if err := service.AdminAttributes().UnbindCategoryGroup(ctx, req.CategoryID, req.GroupID); err != nil {
 		return nil, toAPIError(ctx, err)
 	}

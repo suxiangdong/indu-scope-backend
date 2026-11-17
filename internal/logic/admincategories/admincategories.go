@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
-	"github.com/gogf/gf/v2/frame/g"
 
 	"github.com/suxiangdong/indu-scope-backend/internal/consts"
 	"github.com/suxiangdong/indu-scope-backend/internal/dao"
@@ -52,21 +52,16 @@ func (s *sAdminCategories) Create(ctx context.Context, parentID *uint64, name st
 	if err := validateCategory(name, status); err != nil {
 		return categorymodel.CategoryItem{}, err
 	}
-	if err := validateParent(ctx, 0, parentID); err != nil {
-		return categorymodel.CategoryItem{}, err
-	}
-	if err := ensureSiblingNameAvailable(ctx, 0, parentID, name); err != nil {
-		return categorymodel.CategoryItem{}, err
-	}
-
-	id, err := dao.Categories.Ctx(ctx).Data(g.Map{
-		"parent_id": parentValue(parentID), "name": name,
-		"sort_order": sortOrder, "status": status,
-	}).InsertAndGetId()
+	var id uint64
+	err := dao.Categories.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		var err error
+		id, err = createCategoryTx(ctx, tx, parentID, name, sortOrder, status)
+		return err
+	})
 	if err != nil {
-		return categorymodel.CategoryItem{}, gerror.Wrap(err, "create category")
+		return categorymodel.CategoryItem{}, err
 	}
-	return s.loadByID(ctx, uint64(id))
+	return s.loadByID(ctx, id)
 }
 
 func (s *sAdminCategories) Update(ctx context.Context, id uint64, parentID *uint64, name string, sortOrder uint, status uint) (categorymodel.CategoryItem, error) {
@@ -78,22 +73,10 @@ func (s *sAdminCategories) Update(ctx context.Context, id uint64, parentID *uint
 	if err := validateCategory(name, status); err != nil {
 		return categorymodel.CategoryItem{}, err
 	}
-	if count, err := dao.Categories.Ctx(ctx).Where(do.Categories{Id: id}).Count(); err != nil {
-		return categorymodel.CategoryItem{}, gerror.Wrap(err, "query category")
-	} else if count == 0 {
-		return categorymodel.CategoryItem{}, consts.ErrCategoryNotFound
-	}
-	if err := validateParent(ctx, id, parentID); err != nil {
+	if err := dao.Categories.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		return updateCategoryTx(ctx, tx, id, parentID, name, sortOrder, status)
+	}); err != nil {
 		return categorymodel.CategoryItem{}, err
-	}
-	if err := ensureSiblingNameAvailable(ctx, id, parentID, name); err != nil {
-		return categorymodel.CategoryItem{}, err
-	}
-	if _, err := dao.Categories.Ctx(ctx).Where(do.Categories{Id: id}).Data(g.Map{
-		"parent_id": parentValue(parentID), "name": name,
-		"sort_order": sortOrder, "status": status,
-	}).Update(); err != nil {
-		return categorymodel.CategoryItem{}, gerror.Wrap(err, "update category")
 	}
 	return s.loadByID(ctx, id)
 }
@@ -102,31 +85,9 @@ func (s *sAdminCategories) Delete(ctx context.Context, id uint64) error {
 	if id == 0 {
 		return &consts.InvalidParameterError{Message: "id is required"}
 	}
-	if count, err := dao.Categories.Ctx(ctx).Where(do.Categories{Id: id}).Count(); err != nil {
-		return gerror.Wrap(err, "query category")
-	} else if count == 0 {
-		return consts.ErrCategoryNotFound
-	}
-	if count, err := dao.Categories.Ctx(ctx).Where(do.Categories{ParentId: id}).Count(); err != nil {
-		return gerror.Wrap(err, "check category children")
-	} else if count > 0 {
-		return consts.ErrCategoryHasChildren
-	}
-	if count, err := dao.Products.Ctx(ctx).Where(do.Products{CategoryId: id}).Count(); err != nil {
-		return gerror.Wrap(err, "check category products")
-	} else if count > 0 {
-		return consts.ErrCategoryHasProducts
-	}
-	result, err := dao.Categories.Ctx(ctx).Where(do.Categories{Id: id}).Delete()
-	if err != nil {
-		return gerror.Wrap(err, "delete category")
-	}
-	if affected, err := result.RowsAffected(); err != nil {
-		return gerror.Wrap(err, "check deleted category")
-	} else if affected == 0 {
-		return consts.ErrCategoryNotFound
-	}
-	return nil
+	return dao.Categories.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		return deleteCategoryTx(ctx, tx, id)
+	})
 }
 
 func (s *sAdminCategories) loadByID(ctx context.Context, id uint64) (categorymodel.CategoryItem, error) {
@@ -154,7 +115,7 @@ func validateCategory(name string, status uint) error {
 	return nil
 }
 
-func validateParent(ctx context.Context, categoryID uint64, parentID *uint64) error {
+func validateParentTx(ctx context.Context, tx gdb.TX, categoryID uint64, parentID *uint64) error {
 	// A zero parent ID represents a top-level category. It is stored as 0 in
 	// the database, so it must not be looked up as an actual category.
 	if parentID == nil || *parentID == 0 {
@@ -163,7 +124,7 @@ func validateParent(ctx context.Context, categoryID uint64, parentID *uint64) er
 	if categoryID != 0 && *parentID == categoryID {
 		return consts.ErrCategoryParentCycle
 	}
-	if count, err := dao.Categories.Ctx(ctx).Where(do.Categories{Id: *parentID}).Count(); err != nil {
+	if count, err := tx.Model("categories").Ctx(ctx).Where(do.Categories{Id: *parentID}).Count(); err != nil {
 		return gerror.Wrap(err, "query category parent")
 	} else if count == 0 {
 		return consts.ErrCategoryParentNotFound
@@ -180,7 +141,7 @@ func validateParent(ctx context.Context, categoryID uint64, parentID *uint64) er
 		}
 		visited[currentID] = struct{}{}
 		var record *entity.Categories
-		if err := dao.Categories.Ctx(ctx).Fields(dao.Categories.Columns().Id, dao.Categories.Columns().ParentId).
+		if err := tx.Model("categories").Ctx(ctx).Fields(dao.Categories.Columns().Id, dao.Categories.Columns().ParentId).
 			Where(do.Categories{Id: currentID}).Scan(&record); err != nil {
 			return gerror.Wrap(err, "query category ancestry")
 		}
@@ -192,9 +153,9 @@ func validateParent(ctx context.Context, categoryID uint64, parentID *uint64) er
 	return nil
 }
 
-func ensureSiblingNameAvailable(ctx context.Context, categoryID uint64, parentID *uint64, name string) error {
+func ensureSiblingNameAvailableTx(ctx context.Context, tx gdb.TX, categoryID uint64, parentID *uint64, name string) error {
 	cols := dao.Categories.Columns()
-	query := dao.Categories.Ctx(ctx).Wheref("%s = ?", cols.Name, name)
+	query := tx.Model("categories").Ctx(ctx).Wheref("%s = ?", cols.Name, name)
 	query = query.Where(do.Categories{ParentId: parentValue(parentID)})
 	if categoryID != 0 {
 		query = query.Wheref("%s <> ?", cols.Id, categoryID)

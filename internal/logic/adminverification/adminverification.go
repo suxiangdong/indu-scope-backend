@@ -168,7 +168,7 @@ func (s *sAdminVerification) personalDetail(ctx context.Context, id uint64) (adm
 	}
 	item := listItemFromPersonal(record, user)
 	return adminverificationmodel.Detail{
-		ListItem: item, UserStatus: uint8(user.Status),
+		ListItem: item, UserStatus: uint8(user.Status), Role: uint8(user.Role),
 		Personal: &adminverificationmodel.PersonalDetail{
 			RealName: record.RealName, IDNumberMasked: idNumberMasked,
 			StorePlatformID: record.StorePlatformId, StorePlatformName: storePlatformName, StoreURL: record.StoreUrl,
@@ -209,12 +209,17 @@ func (s *sAdminVerification) companyDetail(ctx context.Context, id uint64) (admi
 	if err != nil {
 		return adminverificationmodel.Detail{}, err
 	}
-	offices, factories, introduction := decodeProfile(profile)
+	offices, factories, introduction, storePlatformID, storeURL := decodeProfile(profile)
+	storePlatformName, err := loadStorePlatformName(ctx, storePlatformID)
+	if err != nil {
+		return adminverificationmodel.Detail{}, err
+	}
 	company := &adminverificationmodel.CompanyDetail{
 		CompanyName: record.CompanyName, UnifiedSocialCreditCode: record.UnifiedSocialCreditCode,
 		BusinessLicenseEndpoint: record.BusinessLicenseEndpoint, BusinessLicenseBucket: record.BusinessLicenseBucket,
 		BusinessLicensePath: record.BusinessLicensePath, RegisteredAddress: record.RegisteredAddress,
-		Introduction: introduction, Offices: offices, Factories: factories, Contacts: contacts,
+		Introduction: introduction, StorePlatformID: storePlatformID, StorePlatformName: storePlatformName, StoreURL: storeURL,
+		Offices: offices, Factories: factories, Contacts: contacts,
 		VerifiedAt: timePointer(record.VerifiedAt),
 	}
 	if file != nil {
@@ -224,11 +229,11 @@ func (s *sAdminVerification) companyDetail(ctx context.Context, id uint64) (admi
 		company.BusinessLicenseFileName = file.OriginalName
 		company.BusinessLicenseFileSize = int64(file.FileSize)
 		company.BusinessLicenseContentType = file.ContentType
-		if client, clientErr := storage.NewOSSClient(ctx); clientErr == nil {
+		if client, clientErr := storage.OSSClient(); clientErr == nil {
 			company.BusinessLicenseURL, _ = client.SignedURLFor(file.Endpoint, file.Bucket, file.ObjectKey, 10*time.Minute)
 		}
 	}
-	return adminverificationmodel.Detail{ListItem: listItemFromCompany(record, user), UserStatus: uint8(user.Status), Company: company}, nil
+	return adminverificationmodel.Detail{ListItem: listItemFromCompany(record, user), UserStatus: uint8(user.Status), Role: uint8(user.Role), Company: company}, nil
 }
 
 func (s *sAdminVerification) Review(ctx context.Context, adminID uint64, input adminverificationmodel.ReviewInput) (adminverificationmodel.Detail, error) {
@@ -248,7 +253,6 @@ func (s *sAdminVerification) Review(ctx context.Context, adminID uint64, input a
 		return adminverificationmodel.Detail{}, &consts.InvalidParameterError{Message: "reason is required and must contain at most 500 characters when rejecting"}
 	}
 	var userID uint64
-	var currentStatus uint
 	if input.Type == adminverificationmodel.TypePersonal {
 		var record *entity.PersonalVerifications
 		if err := dao.PersonalVerifications.Ctx(ctx).Where(do.PersonalVerifications{Id: input.ID}).Scan(&record); err != nil {
@@ -257,7 +261,7 @@ func (s *sAdminVerification) Review(ctx context.Context, adminID uint64, input a
 		if record == nil {
 			return adminverificationModelError(consts.ErrVerificationNotFound, "")
 		}
-		userID, currentStatus = record.UserId, record.ReviewStatus
+		userID = record.UserId
 	} else {
 		var record *entity.CompanyVerifications
 		if err := dao.CompanyVerifications.Ctx(ctx).Where(do.CompanyVerifications{Id: input.ID}).Scan(&record); err != nil {
@@ -266,56 +270,83 @@ func (s *sAdminVerification) Review(ctx context.Context, adminID uint64, input a
 		if record == nil {
 			return adminverificationModelError(consts.ErrVerificationNotFound, "")
 		}
-		userID, currentStatus = record.UserId, record.ReviewStatus
+		userID = record.UserId
 	}
-	if currentStatus != uint(verificationModelReviewPending) {
-		return adminverificationModelError(consts.ErrVerificationAlreadyReviewed, "")
+	if err := applyVerificationReview(ctx, dao.Users.DB(), adminID, userID, input); err != nil {
+		return adminverificationModelError(err, "review verification")
 	}
-	now := time.Now()
-	reviewStatus := uint(verificationModelReviewApproved)
-	userStatus := uint(1)
-	if input.Action == adminverificationmodel.ActionReject {
-		reviewStatus, userStatus = verificationModelReviewRejected, 0
-	}
-	transaction := dao.Users.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
-		if input.Type == adminverificationmodel.TypePersonal {
-			result, err := tx.Model("personal_verifications").Where("id", input.ID).Where("review_status", verificationModelReviewPending).Data(g.Map{
-				"review_status": reviewStatus, "review_reason": nullableReason(input.Reason),
-				"reviewed_by": adminID, "reviewed_at": now,
-				"verified_at": verifiedAt(input.Action, now),
-			}).Update()
-			if err != nil {
-				return gerror.Wrap(err, "review personal verification")
-			}
-			if affected, err := result.RowsAffected(); err != nil {
-				return gerror.Wrap(err, "check personal verification review")
-			} else if affected == 0 {
-				return consts.ErrVerificationAlreadyReviewed
-			}
-		} else {
-			result, err := tx.Model("company_verifications").Where("id", input.ID).Where("review_status", verificationModelReviewPending).Data(g.Map{
-				"review_status": reviewStatus, "review_reason": nullableReason(input.Reason),
-				"reviewed_by": adminID, "reviewed_at": now,
-				"verified_at": verifiedAt(input.Action, now),
-			}).Update()
-			if err != nil {
-				return gerror.Wrap(err, "review company verification")
-			}
-			if affected, err := result.RowsAffected(); err != nil {
-				return gerror.Wrap(err, "check company verification review")
-			} else if affected == 0 {
-				return consts.ErrVerificationAlreadyReviewed
-			}
+	return s.Detail(ctx, input.Type, input.ID)
+}
+
+func applyVerificationReview(ctx context.Context, db gdb.DB, adminID, userID uint64, input adminverificationmodel.ReviewInput) error {
+	return db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		// Match submission/role switching: always lock the user first, and
+		// decide from the current row rather than the pre-transaction hint.
+		var user *entity.Users
+		if err := tx.Model("users").Fields("id", "role", "status").Where("id", userID).LockUpdate().Scan(&user); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return gerror.Wrap(err, "lock verification user for review")
 		}
-		if _, err := tx.Model("users").Where("id", userID).Data(g.Map{"status": userStatus}).Update(); err != nil {
+		if user == nil {
+			return consts.ErrVerificationNotFound
+		}
+		if user.Status == 2 {
+			return consts.ErrUserDisabled
+		}
+		if user.Role != 1 && user.Role != 2 || (input.Type == adminverificationmodel.TypePersonal && user.Role != 1) {
+			return consts.ErrVerificationTypeConflict
+		}
+		table := "personal_verifications"
+		var companyName string
+		var currentStatus uint
+		if input.Type == adminverificationmodel.TypePersonal {
+			var record *entity.PersonalVerifications
+			if err := tx.Model(table).Where("id", input.ID).Where("user_id", userID).Scan(&record); err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return gerror.Wrap(err, "read personal verification after user lock")
+			}
+			if record == nil {
+				return consts.ErrVerificationNotFound
+			}
+			currentStatus = record.ReviewStatus
+		} else {
+			table = "company_verifications"
+			var record *entity.CompanyVerifications
+			if err := tx.Model(table).Where("id", input.ID).Where("user_id", userID).Scan(&record); err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return gerror.Wrap(err, "read company verification after user lock")
+			}
+			if record == nil {
+				return consts.ErrVerificationNotFound
+			}
+			currentStatus, companyName = record.ReviewStatus, strings.TrimSpace(record.CompanyName)
+		}
+		if currentStatus != verificationModelReviewPending {
+			return consts.ErrVerificationAlreadyReviewed
+		}
+		now := time.Now()
+		reviewStatus, userStatus := uint(verificationModelReviewApproved), uint(1)
+		if input.Action == adminverificationmodel.ActionReject {
+			reviewStatus, userStatus = verificationModelReviewRejected, 0
+		}
+		result, err := tx.Model(table).Where("id", input.ID).Where("review_status", verificationModelReviewPending).Data(g.Map{
+			"review_status": reviewStatus, "review_reason": nullableReason(input.Reason),
+			"reviewed_by": adminID, "reviewed_at": now, "verified_at": verifiedAt(input.Action, now),
+		}).Update()
+		if err != nil {
+			return gerror.Wrap(err, "review verification")
+		}
+		if affected, err := result.RowsAffected(); err != nil {
+			return gerror.Wrap(err, "check verification review")
+		} else if affected == 0 {
+			return consts.ErrVerificationAlreadyReviewed
+		}
+		userData := g.Map{"status": userStatus}
+		if input.Type == adminverificationmodel.TypeCompany && input.Action == adminverificationmodel.ActionApprove && companyName != "" {
+			userData["company_name"] = companyName
+		}
+		if _, err := tx.Model("users").Where("id", userID).Data(userData).Update(); err != nil {
 			return gerror.Wrap(err, "update user verification status")
 		}
 		return nil
 	})
-	if transaction != nil {
-		return adminverificationModelError(transaction, "review verification")
-	}
-	return s.Detail(ctx, input.Type, input.ID)
 }
 
 const (
@@ -358,7 +389,7 @@ func verifiedAt(action string, now time.Time) any {
 func loadUser(ctx context.Context, id uint64) (*entity.Users, error) {
 	cols := dao.Users.Columns()
 	var user *entity.Users
-	if err := dao.Users.Ctx(ctx).Fields(cols.Id, cols.Phone, cols.Status, cols.Role, cols.UserType).
+	if err := dao.Users.Ctx(ctx).Fields(cols.Id, cols.Phone, cols.CompanyName, cols.Status, cols.Role, cols.UserType).
 		Where(do.Users{Id: id}).Scan(&user); err != nil {
 		return nil, gerror.Wrap(err, "query verification user")
 	}
@@ -375,7 +406,7 @@ func loadUsers(ctx context.Context, ids []uint64) (map[uint64]*entity.Users, err
 	}
 	cols := dao.Users.Columns()
 	var users []*entity.Users
-	if err := dao.Users.Ctx(ctx).Fields(cols.Id, cols.Phone, cols.Status, cols.Role, cols.UserType).
+	if err := dao.Users.Ctx(ctx).Fields(cols.Id, cols.Phone, cols.CompanyName, cols.Status, cols.Role, cols.UserType).
 		WhereIn(cols.Id, ids).Scan(&users); err != nil {
 		return nil, gerror.Wrap(err, "query verification users")
 	}
@@ -431,7 +462,7 @@ type fileRecord struct {
 }
 
 func loadBusinessLicenseFile(ctx context.Context, userID uint64, endpoint, bucket, path string) (*fileRecord, error) {
-	model := g.DB().Model("user_files").Ctx(ctx).Where("user_id", userID).Where("purpose", "business_license")
+	model := dao.UserFiles.Ctx(ctx).Where("user_id", userID).Where("purpose", "business_license")
 	if endpoint != "" && bucket != "" && path != "" {
 		model = model.Where("endpoint", endpoint).Where("bucket", bucket).Where("object_key", path)
 	} else if bucket != "" && path != "" {
@@ -470,15 +501,17 @@ func loadCompanyContacts(ctx context.Context, userID uint64) ([]adminverificatio
 	return contacts, nil
 }
 
-func decodeProfile(profile *entity.CompanyProfiles) (offices, factories []string, introduction string) {
+func decodeProfile(profile *entity.CompanyProfiles) (offices, factories []string, introduction string, storePlatformID uint64, storeURL string) {
 	offices, factories = []string{}, []string{}
 	if profile == nil {
-		return offices, factories, ""
+		return offices, factories, "", 0, ""
 	}
 	introduction = profile.IntroductionHtml
+	storePlatformID = profile.StorePlatformId
+	storeURL = profile.StoreUrl
 	_ = json.Unmarshal([]byte(profile.Offices), &offices)
 	_ = json.Unmarshal([]byte(profile.Factories), &factories)
-	return offices, factories, introduction
+	return offices, factories, introduction, storePlatformID, storeURL
 }
 
 func loadStorePlatformName(ctx context.Context, id uint64) (string, error) {

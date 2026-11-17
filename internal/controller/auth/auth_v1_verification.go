@@ -81,6 +81,21 @@ func (c *ControllerV1) UploadBusinessLicense(ctx context.Context, req *v1.Upload
 	}}, nil
 }
 
+func (c *ControllerV1) RecognizeBusinessLicense(ctx context.Context, _ *v1.RecognizeBusinessLicenseReq) (*v1.RecognizeBusinessLicenseRes, error) {
+	if err := requireAuthenticatedUser(ctx); err != nil {
+		return nil, err
+	}
+	result, err := service.Auth().RecognizeBusinessLicense(ctx)
+	if err != nil {
+		return nil, toAPIError(ctx, err)
+	}
+	return &v1.RecognizeBusinessLicenseRes{
+		CompanyName:             result.CompanyName,
+		UnifiedSocialCreditCode: result.UnifiedSocialCreditCode,
+		BusinessAddress:         result.BusinessAddress,
+	}, nil
+}
+
 func (c *ControllerV1) UploadIDCard(ctx context.Context, req *v1.UploadIDCardReq) (*v1.UploadIDCardRes, error) {
 	if err := requireAuthenticatedUser(ctx); err != nil {
 		return nil, err
@@ -128,6 +143,9 @@ func (c *ControllerV1) SubmitPersonalVerification(ctx context.Context, req *v1.S
 	if err := requireAuthenticatedUser(ctx); err != nil {
 		return nil, err
 	}
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "personal verification request is required")
+	}
 	result, err := service.Auth().SubmitPersonalVerification(ctx, verificationModel.PersonalInput{
 		Role: req.Role, RealName: req.RealName, IDNumber: req.IDNumber, StorePlatformID: req.StorePlatformID, StoreURL: req.StoreURL,
 		IDFrontEndpoint: req.IDFrontEndpoint, IDFrontBucket: req.IDFrontBucket, IDFrontPath: req.IDFrontPath,
@@ -143,12 +161,16 @@ func (c *ControllerV1) SubmitCompanyVerification(ctx context.Context, req *v1.Su
 	if err := requireAuthenticatedUser(ctx); err != nil {
 		return nil, err
 	}
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "company verification request is required")
+	}
 	result, err := service.Auth().SubmitCompanyVerification(ctx, verificationModel.CompanyInput{
 		Role: req.Role, CompanyName: req.CompanyName, UnifiedSocialCreditCode: req.UnifiedSocialCreditCode,
 		BusinessLicenseEndpoint: req.BusinessLicenseEndpoint,
 		BusinessLicenseBucket:   req.BusinessLicenseBucket, BusinessLicensePath: req.BusinessLicensePath,
 		RegisteredAddress: req.RegisteredAddress,
-		Introduction:      req.Introduction, Offices: req.Offices, Factories: req.Factories,
+		Introduction:      req.Introduction, StorePlatformID: req.StorePlatformID, StoreURL: req.StoreURL,
+		Offices: req.Offices, Factories: req.Factories,
 		Contacts: toContactInputs(req.Contacts),
 	})
 	if err != nil {
@@ -190,6 +212,9 @@ func toAPIVerification(result verificationModel.Summary) v1.VerificationInfo {
 			BusinessLicenseContentType: result.Company.BusinessLicenseContentType,
 			RegisteredAddress:          result.Company.RegisteredAddress,
 			Introduction:               result.Company.Introduction,
+			StorePlatformID:            result.Company.StorePlatformID,
+			StorePlatformName:          result.Company.StorePlatformName,
+			StoreURL:                   result.Company.StoreURL,
 			Offices:                    result.Company.Offices,
 			Factories:                  result.Company.Factories,
 			Contacts:                   toAPIContacts(result.Company.Contacts),

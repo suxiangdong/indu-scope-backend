@@ -3,6 +3,7 @@ package adminverification
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/suxiangdong/indu-scope-backend/api/adminverification/v1"
 	adminverificationmodel "github.com/suxiangdong/indu-scope-backend/internal/model/adminverification"
@@ -10,6 +11,9 @@ import (
 )
 
 func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (*v1.ListRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "verification list request is required")
+	}
 	result, err := service.AdminVerification().List(ctx, adminverificationmodel.ListFilter{Type: req.Type, ReviewStatus: req.ReviewStatus})
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -22,6 +26,9 @@ func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (*v1.ListRes, 
 }
 
 func (c *ControllerV1) Detail(ctx context.Context, req *v1.DetailReq) (*v1.DetailRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "verification detail request is required")
+	}
 	result, err := service.AdminVerification().Detail(ctx, req.Type, req.ID)
 	if err != nil {
 		return nil, toAPIError(ctx, err)
@@ -30,6 +37,9 @@ func (c *ControllerV1) Detail(ctx context.Context, req *v1.DetailReq) (*v1.Detai
 }
 
 func (c *ControllerV1) Review(ctx context.Context, req *v1.ReviewReq) (*v1.ReviewRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "verification review request is required")
+	}
 	value := service.Bizctx().Get(ctx)
 	if value == nil || value.AdminUser == nil {
 		return nil, toAPIError(ctx, gerror.New("admin authorization is required"))

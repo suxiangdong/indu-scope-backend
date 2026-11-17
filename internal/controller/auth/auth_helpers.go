@@ -20,22 +20,23 @@ func toAPIData(result authmodel.AuthResult) v1.AuthData {
 		AccessToken: result.AccessToken,
 		TokenType:   "Bearer",
 		User: v1.UserInfo{
-			ID:       result.User.ID,
-			Phone:    result.User.Phone,
-			Role:     result.User.Role,
-			UserType: result.User.UserType,
-			Status:   result.User.Status,
+			ID:          result.User.ID,
+			Phone:       result.User.Phone,
+			CompanyName: result.User.CompanyName,
+			Role:        result.User.Role,
+			UserType:    result.User.UserType,
+			Status:      result.User.Status,
 		},
 	}
 }
 
 func toAPIError(ctx context.Context, err error) error {
-	// Keep the upstream WeChat error visible to the client. These failures are
-	// usually configuration, expired-code, or permission problems; collapsing
-	// them into a generic 500 makes the mini-program impossible to diagnose.
+	// Keep upstream details in server logs only. WeChat error messages can
+	// contain credential or implementation details that must not be exposed to
+	// the mini-program.
 	if isWechatAuthError(err) {
 		glog.Errorf(ctx, "wechat auth error: %+v", err)
-		return gerror.NewCode(gcode.CodeBusinessValidationFailed, err.Error())
+		return gerror.NewCode(gcode.CodeBusinessValidationFailed, "微信认证失败，请稍后重试")
 	}
 	switch {
 	case errors.Is(err, consts.ErrPhoneAlreadyExists):

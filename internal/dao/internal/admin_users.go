@@ -27,6 +27,7 @@ type AdminUsersColumns struct {
 	Phone        string //
 	PasswordHash string //
 	Status       string //
+	IsSuperAdmin string //
 	LastLoginAt  string //
 	CreatedAt    string //
 	UpdatedAt    string //
@@ -40,6 +41,7 @@ var adminUsersColumns = AdminUsersColumns{
 	Phone:        "phone",
 	PasswordHash: "password_hash",
 	Status:       "status",
+	IsSuperAdmin: "is_super_admin",
 	LastLoginAt:  "last_login_at",
 	CreatedAt:    "created_at",
 	UpdatedAt:    "updated_at",

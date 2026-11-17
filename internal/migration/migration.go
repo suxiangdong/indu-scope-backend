@@ -124,3 +124,18 @@ func Down(dsn string) error {
 	}
 	return nil
 }
+
+// Force marks the migration metadata at version without running SQL. It is
+// intended only to clear a dirty migration after the operator has verified
+// whether its SQL was applied partially.
+func Force(dsn string, version int) error {
+	runner, err := New(dsn)
+	if err != nil {
+		return err
+	}
+	defer runner.Close()
+	if err := runner.Force(version); err != nil {
+		return fmt.Errorf("force migration version: %w", err)
+	}
+	return nil
+}

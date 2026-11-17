@@ -12,5 +12,10 @@ import (
 
 type ISupplierProductsV1 interface {
 	FormOptions(ctx context.Context, req *v1.FormOptionsReq) (res *v1.FormOptionsRes, err error)
+	List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error)
+	Detail(ctx context.Context, req *v1.DetailReq) (res *v1.DetailRes, err error)
 	Create(ctx context.Context, req *v1.CreateReq) (res *v1.CreateRes, err error)
+	UpdateStock(ctx context.Context, req *v1.UpdateStockReq) (res *v1.UpdateStockRes, err error)
+	UpdateStatus(ctx context.Context, req *v1.UpdateStatusReq) (res *v1.UpdateStatusRes, err error)
+	UploadImage(ctx context.Context, req *v1.UploadImageReq) (res *v1.UploadImageRes, err error)
 }
