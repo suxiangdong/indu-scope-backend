@@ -1,0 +1,73 @@
+# 线上后端配置模板：将全部 __...__ 占位符替换为真实值后使用。
+# 建议保存到服务器 /data/deploy/indu/config.yaml，使用 GF_GCFG_FILE 指定路径。
+# 占位符需要手动填写，不会自动从同名环境变量替换。
+# 后端监听 HTTP 8000，由反向代理提供公网 HTTPS。
+
+server:
+  address: ":8000"
+  swagger_enabled: false
+  openapiPath: ""
+  swaggerPath: ""
+
+logger:
+  level: "info"
+  stdout: true
+
+database:
+  default:
+    type: "mysql"
+    # loc 设置 Go 端日期解析时区。MySQL 实例时区另行配置为 +08:00。
+    # 当前 GoFrame 会把 DSN 的 time_zone 映射到 timezone，不能在这里添加 time_zone。
+    link: "mysql:__MYSQL_USER__:__MYSQL_PASSWORD__@tcp(__MYSQL_HOST__:3306)/__MYSQL_DATABASE__?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai"
+    maxOpen: 10
+    maxIdle: 10
+    debug: false
+
+redis:
+  default:
+    address: "__REDIS_HOST__:6379"
+    # 没有配置 Redis ACL 用户时保持空字符串；有 ACL 时填写实际用户名。
+    user: ""
+    pass: "__REDIS_PASSWORD__"
+    db: 0
+    dialTimeout: "5s"
+    readTimeout: "3s"
+    writeTimeout: "3s"
+
+jwt:
+  # 执行 openssl rand -hex 32 生成，然后替换此占位符；至少 32 个字符。
+  secret: "__JWT_SECRET__"
+
+wechat:
+  app_id: "wx550ed33a6840ccec"
+  app_secret: "__WECHAT_MINIPROGRAM_APP_SECRET__"
+  api_base_url: "https://api.weixin.qq.com"
+
+# 普通微信支付使用微信支付公钥模式；填写完成后启用真实收款。
+# 如暂不开通收费，将 enabled 改成 false。
+# WECHAT_PAY_* 环境变量优先于本配置，空环境变量也会覆盖这里的值。
+wechat_pay:
+  enabled: true
+  mch_id: "1005166565"
+  merchant_serial_no: "__MERCHANT_API_CERTIFICATE_SERIAL_NO__"
+  # 必须是商户平台设置的 32 字节 API v3 密钥。
+  api_v3_key: "__WECHAT_PAY_API_V3_KEY__"
+  merchant_private_key_path: "/data/deploy/indu/certs/apiclient_key.pem"
+  # 填写商户平台显示的完整公钥 ID，包含 PUB_KEY_ID_ 前缀。
+  public_key_id: "__WECHAT_PAY_PUBLIC_KEY_ID__"
+  public_key_path: "/data/deploy/indu/certs/pub_key.pem"
+  # 将 __API_DOMAIN__ 替换为后端正式域名，不包含 https:// 或路径。
+  notify_url: "https://__API_DOMAIN__/api/v1/payment/wechat/notify"
+  refund_notify_url: "https://__API_DOMAIN__/api/v1/payment/wechat/refund/notify"
+
+oss:
+  # 当前使用北京地域；如生产桶在其他地域，需要同步修改 endpoint。
+  endpoint: "https://oss-cn-beijing.aliyuncs.com"
+  bucket: "env-production"
+  access_key_id: "__ALIYUN_ACCESS_KEY_ID__"
+  access_key_secret: "__ALIYUN_ACCESS_KEY_SECRET__"
+  key_prefix: "indu/verification"
+
+# OCR 与 OSS 复用上面的阿里云 AccessKey。
+ocr:
+  endpoint: "ocr-api.cn-hangzhou.aliyuncs.com"
