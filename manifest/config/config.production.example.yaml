@@ -1,10 +1,10 @@
 # 线上后端配置模板：将全部 __...__ 占位符替换为真实值后使用。
 # 建议保存到服务器 /data/deploy/indu/config.yaml，使用 GF_GCFG_FILE 指定路径。
 # 占位符需要手动填写，不会自动从同名环境变量替换。
-# 后端监听 HTTP 8000，由反向代理提供公网 HTTPS。
+# 后端监听 HTTP 8001，由反向代理提供公网 HTTPS。
 
 server:
-  address: ":8000"
+  address: ":8001"
   swagger_enabled: false
   openapiPath: ""
   swaggerPath: ""
@@ -56,9 +56,8 @@ wechat_pay:
   # 填写商户平台显示的完整公钥 ID，包含 PUB_KEY_ID_ 前缀。
   public_key_id: "__WECHAT_PAY_PUBLIC_KEY_ID__"
   public_key_path: "/data/deploy/indu/certs/pub_key.pem"
-  # 将 __API_DOMAIN__ 替换为后端正式域名，不包含 https:// 或路径。
-  notify_url: "https://__API_DOMAIN__/api/v1/payment/wechat/notify"
-  refund_notify_url: "https://__API_DOMAIN__/api/v1/payment/wechat/refund/notify"
+  notify_url: "https://indu.cffytech.com/api/v1/payment/wechat/notify"
+  refund_notify_url: "https://indu.cffytech.com/api/v1/payment/wechat/refund/notify"
 
 oss:
   # 当前使用北京地域；如生产桶在其他地域，需要同步修改 endpoint。
