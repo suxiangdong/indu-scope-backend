@@ -1,6 +1,10 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"time"
+
+	"github.com/gogf/gf/v2/frame/g"
+)
 
 type PageContent struct {
 	ID            uint64 `json:"id"`
@@ -24,4 +28,23 @@ type GetReq struct {
 type GetRes struct {
 	g.Meta `mime:"application/json"`
 	PageContent
+}
+
+type AgreementContent struct {
+	ID        uint64    `json:"id"`
+	Key       string    `json:"key"`
+	Title     string    `json:"title"`
+	Content   string    `json:"content"`
+	Status    uint8     `json:"status"`
+	Version   uint      `json:"version"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type AgreementsReq struct {
+	g.Meta `path:"/api/v1/app-agreements" tags:"AppContent" method:"get" summary:"List current user agreement and privacy policy"`
+}
+
+type AgreementsRes struct {
+	g.Meta `mime:"application/json"`
+	Items  []AgreementContent `json:"items"`
 }

@@ -2,6 +2,8 @@ package vip
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -27,8 +29,8 @@ type agreementRow struct {
 // key. Historical rows remain in vip_agreements for order auditing and future
 // administration, but are never shown as current agreements.
 func (s *sVip) ListAgreements(ctx context.Context, activeOnly bool) ([]vipModel.Agreement, error) {
-	items := make([]vipModel.Agreement, 0, 2)
-	for _, key := range []string{vipModel.AgreementKeyService, vipModel.AgreementKeyAutoRenew} {
+	items := make([]vipModel.Agreement, 0, 4)
+	for _, key := range []string{vipModel.AgreementKeyService, vipModel.AgreementKeyAutoRenew, vipModel.AgreementKeyUser, vipModel.AgreementKeyPrivacy} {
 		item, err := s.latestAgreement(ctx, key, activeOnly)
 		if err != nil {
 			return nil, err
@@ -48,6 +50,9 @@ func latestAgreement(query *gdb.Model, key string, activeOnly bool) (*vipModel.A
 	var row agreementRow
 	query = query.Where("agreement_key", key).OrderDesc("version").OrderDesc("id").Limit(1)
 	if err := query.Scan(&row); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, gerror.Wrap(err, "get latest vip agreement")
 	}
 	if row.ID == 0 || (activeOnly && row.Status != 1) {
@@ -63,7 +68,8 @@ func (s *sVip) UpdateAgreement(ctx context.Context, input vipModel.AgreementInpu
 	input.Key = strings.TrimSpace(input.Key)
 	input.Title = strings.TrimSpace(input.Title)
 	input.Content = strings.TrimSpace(input.Content)
-	if input.Key != vipModel.AgreementKeyService && input.Key != vipModel.AgreementKeyAutoRenew {
+	if input.Key != vipModel.AgreementKeyService && input.Key != vipModel.AgreementKeyAutoRenew &&
+		input.Key != vipModel.AgreementKeyUser && input.Key != vipModel.AgreementKeyPrivacy {
 		return vipModel.Agreement{}, &consts.InvalidParameterError{Message: "agreement key is invalid"}
 	}
 	if input.Title == "" || len([]rune(input.Title)) > 100 {
@@ -77,13 +83,20 @@ func (s *sVip) UpdateAgreement(ctx context.Context, input vipModel.AgreementInpu
 	}
 
 	var result vipModel.Agreement
-	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
-		var latest agreementRow
-		if err := tx.Model("vip_agreements").Where("agreement_key", input.Key).OrderDesc("version").OrderDesc("id").Limit(1).LockUpdate().Scan(&latest); err != nil {
-			return gerror.Wrap(err, "get current vip agreement version")
+	err := s.paymentDB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		// The immutable first row is shared by every writer, including the
+		// manual release SQL. A stable existing record also serializes creation
+		// of a key's first version, where there is no latest row to lock yet.
+		var anchor struct{ ID uint64 }
+		if err := tx.Model("vip_agreements").Fields("id").OrderAsc("id").Limit(1).LockUpdate().Scan(&anchor); err != nil {
+			return gerror.Wrap(err, "lock agreement version writer")
 		}
-		if latest.ID == 0 {
-			return gerror.New("vip agreement not found")
+		if anchor.ID == 0 {
+			return gerror.New("initial agreement records are missing; run database migrations first")
+		}
+		var latest agreementRow
+		if err := tx.Model("vip_agreements").Where("agreement_key", input.Key).OrderDesc("version").OrderDesc("id").Limit(1).LockUpdate().Scan(&latest); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return gerror.Wrap(err, "get current vip agreement version")
 		}
 		id, err := tx.Model("vip_agreements").Data(g.Map{
 			"agreement_key": input.Key,

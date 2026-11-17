@@ -33,9 +33,11 @@ func New() service.IVip { return &sVip{} }
 func init() { service.RegisterVip(New()) }
 
 func (s *sVip) ListPlans(ctx context.Context, activeOnly bool) ([]vipModel.Plan, error) {
-	query := g.DB().Model("vip_plans")
+	query := s.paymentDB().Model("vip_plans").Ctx(ctx)
 	if activeOnly {
-		query = query.Where("status", 1)
+		// The app catalog must only advertise purchasable plans. Recurring
+		// contracts are not available until their signing flow is implemented.
+		query = query.Where("status", 1).Where("plan_type", "normal")
 	}
 	var rows []planRow
 	if err := query.OrderAsc("sort_order").OrderAsc("id").Scan(&rows); err != nil {

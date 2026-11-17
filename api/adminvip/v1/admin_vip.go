@@ -56,7 +56,7 @@ type ListAgreementsRes struct {
 
 type UpdateAgreementReq struct {
 	g.Meta  `path:"/api/v1/admin/vip/agreements/update" tags:"AdminVip" method:"post" summary:"Update VIP agreement"`
-	Key     string `json:"key" v:"required|in:service,auto-renew"`
+	Key     string `json:"key" v:"required|in:service,auto-renew,user,privacy"`
 	Title   string `json:"title" v:"required"`
 	Content string `json:"content" v:"required"`
 	Status  *uint8 `json:"status"`

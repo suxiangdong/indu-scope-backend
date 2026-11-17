@@ -5,6 +5,8 @@ import "time"
 const (
 	AgreementKeyService   = "service"
 	AgreementKeyAutoRenew = "auto-renew"
+	AgreementKeyUser      = "user"
+	AgreementKeyPrivacy   = "privacy"
 )
 
 type Plan struct {

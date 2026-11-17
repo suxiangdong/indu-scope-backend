@@ -31,6 +31,8 @@ JWT 密钥至少需要 32 个字符；真实配置文件不会提交到 Git。
 
 生产环境可在 `server.swagger_enabled` 设置为 `false`，同时关闭 Swagger UI 和 `/api.json` OpenAPI 文档；开发环境保持为 `true` 即可。
 
+小程序登录前通过公开接口 `GET /api/v1/app-agreements` 读取 `user` 用户协议与 `privacy` 隐私政策。首次启用时，先部署后端，再核对并手动执行 `docs/sql/miniapp_release_agreements.sql`，最后发布新小程序。脚本不会随启动自动执行；它追加协议版本并保留订单引用的历史协议，同时以真实邮箱替换联系页的示例资料。缺失或停用最新协议时，客户端会阻止登录，不会使用旧版本兜底。后台“协议管理”支持用户协议、隐私政策、会员服务协议和自动续费协议，每次保存均新增版本。
+
 换电脑时请先阅读 [`docs/development-onboarding.md`](docs/development-onboarding.md)，其中包含三个仓库的克隆方式、MySQL/Redis 配置、迁移、Taro 小程序、微信开发者工具和管理后台的完整启动顺序。
 
 ## 项目结构

@@ -76,7 +76,7 @@ func (s *sVip) CreateOrder(ctx context.Context, userID, planID uint64, autoRenew
 		if (planType == "auto_renew") != autoRenew {
 			return errors.New("套餐类型与自动续费选项不匹配")
 		}
-		if planType == "auto_renew" && plan.PriceFen > 0 {
+		if planType == "auto_renew" {
 			return errors.New("连续包月签约尚未开通，请选择普通套餐")
 		}
 		serviceAgreement, err := latestAgreement(tx.Model("vip_agreements"), vipModel.AgreementKeyService, true)

@@ -14,13 +14,15 @@ import (
 )
 
 func (c *ControllerV1) ListPlans(ctx context.Context, req *v1.ListPlansReq) (*v1.ListPlansRes, error) {
-	activeOnly := req != nil && req.Status == nil
-	items, err := service.Vip().ListPlans(ctx, activeOnly)
+	items, err := service.Vip().ListPlans(ctx, false)
 	if err != nil {
 		return nil, toAPIError(err)
 	}
 	result := make([]v1.PlanInfo, 0, len(items))
 	for _, item := range items {
+		if req != nil && req.Status != nil && item.Status != *req.Status {
+			continue
+		}
 		result = append(result, toPlanAPI(item))
 	}
 	return &v1.ListPlansRes{Items: result}, nil

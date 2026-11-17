@@ -11,8 +11,28 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/api/appcontent/v1"
 	"github.com/suxiangdong/indu-scope-backend/internal/consts"
 	appcontentModel "github.com/suxiangdong/indu-scope-backend/internal/model/appcontent"
+	vipModel "github.com/suxiangdong/indu-scope-backend/internal/model/vip"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 )
+
+// This controller is bound in the anonymous content group. Login policies
+// must be readable before the user has an authenticated or verified account.
+func (c *ControllerV1) Agreements(ctx context.Context, _ *v1.AgreementsReq) (*v1.AgreementsRes, error) {
+	items, err := service.Vip().ListAgreements(ctx, true)
+	if err != nil {
+		glog.Errorf(ctx, "get app agreements failed: %+v", err)
+		return nil, gerror.NewCode(gcode.CodeInternalError, "internal server error")
+	}
+	result := make([]v1.AgreementContent, 0, 2)
+	for _, item := range items {
+		if item.Key != vipModel.AgreementKeyUser && item.Key != vipModel.AgreementKeyPrivacy {
+			continue
+		}
+		result = append(result, v1.AgreementContent{ID: item.ID, Key: item.Key, Title: item.Title,
+			Content: item.Content, Status: item.Status, Version: item.Version, UpdatedAt: item.UpdatedAt})
+	}
+	return &v1.AgreementsRes{Items: result}, nil
+}
 
 func (c *ControllerV1) Get(ctx context.Context, req *v1.GetReq) (*v1.GetRes, error) {
 	if req == nil {

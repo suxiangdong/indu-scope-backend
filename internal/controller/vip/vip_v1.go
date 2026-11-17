@@ -33,6 +33,9 @@ func (c *ControllerV1) Agreements(ctx context.Context, _ *v1.AgreementsReq) (*v1
 	}
 	result := make([]v1.AgreementInfo, 0, len(items))
 	for _, item := range items {
+		if item.Key != vipModel.AgreementKeyService && item.Key != vipModel.AgreementKeyAutoRenew {
+			continue
+		}
 		result = append(result, toAgreementAPI(item))
 	}
 	return &v1.AgreementsRes{Items: result}, nil
