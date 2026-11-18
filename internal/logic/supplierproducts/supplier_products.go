@@ -21,6 +21,7 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/model/entity"
 	supplierProductModel "github.com/suxiangdong/indu-scope-backend/internal/model/supplierproduct"
 	"github.com/suxiangdong/indu-scope-backend/internal/pagination"
+	"github.com/suxiangdong/indu-scope-backend/internal/productstatus"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 	"github.com/suxiangdong/indu-scope-backend/internal/storage"
 )
@@ -354,39 +355,9 @@ func (s *sSupplierProducts) UpdateStatus(ctx context.Context, supplierUserID, pr
 	if status != 1 && status != 2 {
 		return supplierProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "supplier product status must be 1 or 2"}
 	}
-	var current struct {
-		ID     uint64
-		Status uint8
-	}
-	if err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Fields("id", "status").Where(do.Products{Id: productID, SupplierUserId: supplierUserID}).Scan(&current); err != nil {
-		return supplierProductModel.ProductItem{}, gerror.Wrap(err, "query supplier product")
-	}
-	if current.ID == 0 {
-		return supplierProductModel.ProductItem{}, consts.ErrProductNotFound
-	}
-	if current.Status == 0 {
-		return supplierProductModel.ProductItem{}, consts.ErrProductPendingReview
-	}
-	if current.Status == status {
-		return s.Detail(ctx, supplierUserID, productID)
-	}
-	result, err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).
-		Where(do.Products{Id: productID, SupplierUserId: supplierUserID, Status: current.Status}).
-		Data(g.Map{"status": status}).Update()
-	if err != nil {
-		return supplierProductModel.ProductItem{}, gerror.Wrap(err, "update supplier product status")
-	}
-	if affected, err := result.RowsAffected(); err != nil {
-		return supplierProductModel.ProductItem{}, gerror.Wrap(err, "check updated supplier product status")
-	} else if affected == 0 {
-		var latest struct{ Status uint8 }
-		if err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Fields("status").Where(do.Products{Id: productID, SupplierUserId: supplierUserID}).Scan(&latest); err != nil {
-			return supplierProductModel.ProductItem{}, gerror.Wrap(err, "check current supplier product status")
-		}
-		if latest.Status == status {
-			return s.Detail(ctx, supplierUserID, productID)
-		}
-		return supplierProductModel.ProductItem{}, consts.ErrProductUnavailable
+	if err := productstatus.Change(dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).
+		Where(do.Products{Id: productID, SupplierUserId: supplierUserID}), status); err != nil {
+		return supplierProductModel.ProductItem{}, err
 	}
 	return s.Detail(ctx, supplierUserID, productID)
 }

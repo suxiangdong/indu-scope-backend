@@ -214,7 +214,7 @@ func toAPI(item supplierProductModel.ProductItem) v1.ProductInfo {
 
 func toAPIError(ctx context.Context, err error) error {
 	switch {
-	case errors.Is(err, consts.ErrCategoryNotFound), errors.Is(err, consts.ErrSupplierRequired), errors.Is(err, consts.ErrProductNotFound), errors.Is(err, consts.ErrProductPendingReview), errors.Is(err, consts.ErrProductUnavailable):
+	case errors.Is(err, consts.ErrCategoryNotFound), errors.Is(err, consts.ErrSupplierRequired), errors.Is(err, consts.ErrProductNotFound), errors.Is(err, consts.ErrProductPendingReview), errors.Is(err, consts.ErrProductStatusChanged), errors.Is(err, consts.ErrProductUnavailable):
 		return gerror.NewCode(gcode.CodeBusinessValidationFailed, err.Error())
 	}
 	var parameterError *consts.InvalidParameterError

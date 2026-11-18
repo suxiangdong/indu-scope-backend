@@ -10,6 +10,7 @@ type IAdminProducts interface {
 	List(ctx context.Context, filter adminProductModel.ListFilter) (adminProductModel.ListResult, error)
 	Detail(ctx context.Context, id uint64) (adminProductModel.ProductItem, error)
 	UpdateStatus(ctx context.Context, id uint64, status uint8) (adminProductModel.ProductItem, error)
+	Review(ctx context.Context, id uint64) (adminProductModel.ProductItem, error)
 }
 
 var localAdminProducts IAdminProducts

@@ -81,3 +81,13 @@ type UpdateStatusRes struct {
 	g.Meta `mime:"application/json"`
 	ProductInfo
 }
+
+type ReviewReq struct {
+	g.Meta `path:"/api/v1/admin/products/review" tags:"AdminProducts" method:"post" summary:"Approve product review without publishing"`
+	ID     uint64 `json:"id" v:"required"`
+}
+
+type ReviewRes struct {
+	g.Meta `mime:"application/json"`
+	ProductInfo
+}

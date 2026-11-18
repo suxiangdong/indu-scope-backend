@@ -56,6 +56,8 @@ var (
 	ErrBuyerRequired                   = gerror.New("buyer authorization is required")
 	ErrProductNotFound                 = gerror.New("product not found")
 	ErrProductPendingReview            = gerror.New("产品正在审核中，审核通过后才能上下架")
+	ErrProductAlreadyReviewed          = gerror.New("产品已审核，请刷新后查看最新状态")
+	ErrProductStatusChanged            = gerror.New("产品状态已变更，请刷新后重试")
 	ErrProductUnavailable              = gerror.New("product is not available for favorite")
 	ErrRequirementNotFound             = gerror.New("procurement requirement not found")
 	ErrRequirementClosed               = gerror.New("procurement requirement is not accepting responses")

@@ -54,6 +54,17 @@ func (c *ControllerV1) UpdateStatus(ctx context.Context, req *v1.UpdateStatusReq
 	return &v1.UpdateStatusRes{ProductInfo: toAPI(item)}, nil
 }
 
+func (c *ControllerV1) Review(ctx context.Context, req *v1.ReviewReq) (*v1.ReviewRes, error) {
+	if req == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "product review request is required")
+	}
+	item, err := service.AdminProducts().Review(ctx, req.ID)
+	if err != nil {
+		return nil, toAPIError(ctx, err)
+	}
+	return &v1.ReviewRes{ProductInfo: toAPI(item)}, nil
+}
+
 func toAPI(item adminProductModel.ProductItem) v1.ProductInfo {
 	images := make([]v1.ProductImageInfo, 0, len(item.Images))
 	for _, image := range item.Images {
@@ -73,7 +84,8 @@ func toAPI(item adminProductModel.ProductItem) v1.ProductInfo {
 }
 
 func toAPIError(ctx context.Context, err error) error {
-	if errors.Is(err, consts.ErrProductNotFound) {
+	if errors.Is(err, consts.ErrProductNotFound) || errors.Is(err, consts.ErrProductPendingReview) ||
+		errors.Is(err, consts.ErrProductAlreadyReviewed) || errors.Is(err, consts.ErrProductStatusChanged) {
 		return gerror.NewCode(gcode.CodeBusinessValidationFailed, err.Error())
 	}
 	var parameterError *consts.InvalidParameterError

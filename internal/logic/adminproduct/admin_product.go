@@ -8,7 +8,6 @@ import (
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
-	"github.com/gogf/gf/v2/frame/g"
 
 	"github.com/suxiangdong/indu-scope-backend/internal/consts"
 	"github.com/suxiangdong/indu-scope-backend/internal/dao"
@@ -16,6 +15,7 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/model/do"
 	"github.com/suxiangdong/indu-scope-backend/internal/model/entity"
 	"github.com/suxiangdong/indu-scope-backend/internal/pagination"
+	"github.com/suxiangdong/indu-scope-backend/internal/productstatus"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 	"github.com/suxiangdong/indu-scope-backend/internal/storage"
 )
@@ -112,18 +112,18 @@ func (s *sAdminProducts) UpdateStatus(ctx context.Context, id uint64, status uin
 	if id == 0 {
 		return adminProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "id is required"}
 	}
-	if status > 2 {
-		return adminProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "status must be 0, 1 or 2"}
+	if err := productstatus.Change(dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", id), status); err != nil {
+		return adminProductModel.ProductItem{}, err
 	}
-	count, err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", id).Count()
-	if err != nil {
-		return adminProductModel.ProductItem{}, gerror.Wrap(err, "query product")
+	return s.Detail(ctx, id)
+}
+
+func (s *sAdminProducts) Review(ctx context.Context, id uint64) (adminProductModel.ProductItem, error) {
+	if id == 0 {
+		return adminProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "id is required"}
 	}
-	if count == 0 {
-		return adminProductModel.ProductItem{}, consts.ErrProductNotFound
-	}
-	if _, err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", id).Data(g.Map{"status": status}).Update(); err != nil {
-		return adminProductModel.ProductItem{}, gerror.Wrap(err, "update product status")
+	if err := productstatus.Approve(dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", id)); err != nil {
+		return adminProductModel.ProductItem{}, err
 	}
 	return s.Detail(ctx, id)
 }
