@@ -5,6 +5,7 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
+	userprofilesv1 "github.com/suxiangdong/indu-scope-backend/api/userprofiles/v1"
 )
 
 type CategoryInfo struct {
@@ -145,16 +146,18 @@ type RequirementFileInfo struct {
 }
 
 type RequirementResponseInfo struct {
-	ID                uint64    `json:"id"`
-	RequirementID     uint64    `json:"requirement_id"`
-	SupplierUserID    uint64    `json:"supplier_user_id"`
-	SupplierCompany   string    `json:"supplier_company,omitempty"`
-	Message           string    `json:"message,omitempty"`
-	AvailableQuantity *float64  `json:"available_quantity,omitempty"`
-	LeadTimeDays      *uint     `json:"lead_time_days,omitempty"`
-	Status            uint8     `json:"status"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                uint64                         `json:"id"`
+	RequirementID     uint64                         `json:"requirement_id"`
+	SupplierUserID    uint64                         `json:"supplier_user_id"`
+	SupplierCompany   string                         `json:"supplier_company,omitempty"`
+	CompanyInfo       *userprofilesv1.CompanySummary `json:"company_info,omitempty"`
+	CompanyLocked     bool                           `json:"company_locked"`
+	Message           string                         `json:"message,omitempty"`
+	AvailableQuantity *float64                       `json:"available_quantity,omitempty"`
+	LeadTimeDays      *uint                          `json:"lead_time_days,omitempty"`
+	Status            uint8                          `json:"status"`
+	CreatedAt         time.Time                      `json:"created_at"`
+	UpdatedAt         time.Time                      `json:"updated_at"`
 }
 
 type ContactInfo struct {
@@ -194,9 +197,11 @@ type RequirementInfo struct {
 
 type DetailRes struct {
 	g.Meta        `mime:"application/json"`
-	Requirement   RequirementInfo           `json:"requirement"`
-	Responses     []RequirementResponseInfo `json:"responses"`
-	BuyerContacts []ContactInfo             `json:"buyer_contacts"`
+	Requirement   RequirementInfo                `json:"requirement"`
+	CompanyInfo   *userprofilesv1.CompanySummary `json:"company_info,omitempty"`
+	CompanyLocked bool                           `json:"company_locked"`
+	Responses     []RequirementResponseInfo      `json:"responses"`
+	BuyerContacts []ContactInfo                  `json:"buyer_contacts"`
 }
 
 type CreateRes struct {

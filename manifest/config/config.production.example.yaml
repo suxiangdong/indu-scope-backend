@@ -13,6 +13,10 @@ logger:
   level: "info"
   stdout: true
 
+cache:
+  # 与开发环境隔离；启动加载后，查询不再读取配置文件。
+  prefix: "indu-scope-production"
+
 database:
   default:
     type: "mysql"

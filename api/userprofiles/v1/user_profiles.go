@@ -3,7 +3,7 @@ package v1
 import "github.com/gogf/gf/v2/frame/g"
 
 type ProfileReq struct {
-	g.Meta `path:"/api/v1/user-profiles/profile" tags:"UserProfiles" method:"get" summary:"Get a verified user profile"`
+	g.Meta `path:"/api/v1/user-profiles/profile" tags:"UserProfiles" method:"get" summary:"Get a verified company profile (active VIP required)"`
 	ID     uint64 `json:"id" in:"query" v:"required" dc:"User ID"`
 }
 

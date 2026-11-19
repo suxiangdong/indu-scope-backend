@@ -22,6 +22,7 @@ import (
 	supplierProductModel "github.com/suxiangdong/indu-scope-backend/internal/model/supplierproduct"
 	"github.com/suxiangdong/indu-scope-backend/internal/pagination"
 	"github.com/suxiangdong/indu-scope-backend/internal/productstatus"
+	"github.com/suxiangdong/indu-scope-backend/internal/selectcache"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 	"github.com/suxiangdong/indu-scope-backend/internal/storage"
 )
@@ -145,7 +146,7 @@ func (s *sSupplierProducts) Detail(ctx context.Context, supplierUserID, productI
 		return supplierProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "id is required"}
 	}
 	var product entity.Products
-	if err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).
+	if err := dao.Products.Ctx(ctx).Cache(selectcache.Query(dao.Products.Table(), productID)).
 		Where("id", productID).Scan(&product); err != nil {
 		return supplierProductModel.ProductItem{}, gerror.Wrap(err, "query supplier product detail")
 	}
@@ -329,13 +330,13 @@ func (s *sSupplierProducts) UpdateStock(ctx context.Context, input supplierProdu
 		return supplierProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "stock_quantity must be greater than or equal to 0"}
 	}
 	var current struct{ ID uint64 }
-	if err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Fields("id").Where(do.Products{Id: input.ProductID, SupplierUserId: input.SupplierUserID}).Scan(&current); err != nil {
+	if err := dao.Products.Ctx(ctx).Fields("id").Where(do.Products{Id: input.ProductID, SupplierUserId: input.SupplierUserID}).Scan(&current); err != nil {
 		return supplierProductModel.ProductItem{}, gerror.Wrap(err, "query supplier product for stock update")
 	}
 	if current.ID == 0 {
 		return supplierProductModel.ProductItem{}, consts.ErrProductNotFound
 	}
-	if _, err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where(do.Products{Id: input.ProductID, SupplierUserId: input.SupplierUserID}).Data(g.Map{
+	if _, err := dao.Products.Ctx(ctx).Cache(selectcache.Invalidate(dao.Products.Table(), input.ProductID)).Where(do.Products{Id: input.ProductID, SupplierUserId: input.SupplierUserID}).Data(g.Map{
 		"stock_quantity":   input.StockQuantity,
 		"stock_updated_at": time.Now(),
 		"stock_updated_by": input.SupplierUserID,
@@ -355,7 +356,7 @@ func (s *sSupplierProducts) UpdateStatus(ctx context.Context, supplierUserID, pr
 	if status != 1 && status != 2 {
 		return supplierProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "supplier product status must be 1 or 2"}
 	}
-	if err := productstatus.Change(dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).
+	if err := productstatus.Change(dao.Products.Ctx(ctx).
 		Where(do.Products{Id: productID, SupplierUserId: supplierUserID}), status); err != nil {
 		return supplierProductModel.ProductItem{}, err
 	}

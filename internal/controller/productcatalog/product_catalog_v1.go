@@ -3,13 +3,13 @@ package productcatalog
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/os/glog"
 
 	"github.com/suxiangdong/indu-scope-backend/api/products/v1"
+	"github.com/suxiangdong/indu-scope-backend/internal/companyaccess"
 	"github.com/suxiangdong/indu-scope-backend/internal/consts"
 	productCatalogModel "github.com/suxiangdong/indu-scope-backend/internal/model/productcatalog"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
@@ -51,11 +51,11 @@ func (c *ControllerV1) Detail(ctx context.Context, req *v1.DetailReq) (*v1.Detai
 		return nil, toAPIError(ctx, err)
 	}
 	contacts := make([]v1.ContactInfo, 0, len(result.SupplierContacts))
-	subscription, err := service.Vip().GetSubscription(ctx, userID)
+	allowed, err := companyaccess.Allowed(ctx, userID)
 	if err != nil {
 		return nil, toAPIError(ctx, err)
 	}
-	contactLocked := subscription == nil || (subscription.EndAt != nil && !subscription.EndAt.After(time.Now()))
+	contactLocked := !allowed
 	for _, contact := range result.SupplierContacts {
 		phone := contact.Phone
 		if contactLocked {
@@ -63,7 +63,8 @@ func (c *ControllerV1) Detail(ctx context.Context, req *v1.DetailReq) (*v1.Detai
 		}
 		contacts = append(contacts, v1.ContactInfo{Name: contact.Name, Position: contact.Position, Phone: phone})
 	}
-	return &v1.DetailRes{ProductInfo: toAPI(result.ProductItem), Images: toDetailImages(result.Images), Attributes: toDetailAttributes(result.Attributes), SupplierContacts: contacts, ContactLocked: contactLocked}, nil
+	return &v1.DetailRes{ProductInfo: toAPI(result.ProductItem), Images: toDetailImages(result.Images), Attributes: toDetailAttributes(result.Attributes), SupplierContacts: contacts, ContactLocked: contactLocked,
+		CompanyInfo: companyaccess.Summary(result.SupplierUserID, result.SupplierCompany, allowed), CompanyLocked: !allowed}, nil
 }
 
 func currentBuyerID(ctx context.Context) (uint64, error) {
@@ -79,7 +80,7 @@ func currentBuyerID(ctx context.Context) (uint64, error) {
 
 func toAPI(item productCatalogModel.ProductItem) v1.ProductInfo {
 	return v1.ProductInfo{
-		ID: item.ID, SupplierUserID: item.SupplierUserID, SupplierCompany: item.SupplierCompany,
+		ID: item.ID, SupplierUserID: item.SupplierUserID,
 		CategoryID: item.CategoryID, CategoryName: item.CategoryName, Name: item.Name,
 		StockQuantity: item.StockQuantity, StockUnitID: item.StockUnitID, StockUnitCode: item.StockUnitCode,
 		StockUnitName: item.StockUnitName, CoverURL: item.CoverURL, ImageCount: item.ImageCount,

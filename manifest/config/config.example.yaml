@@ -12,6 +12,10 @@ logger:
   level: "all"
   stdout: true
 
+cache:
+  # SELECT cache names: {prefix}#selectCache#{table}_{id}; loaded at startup.
+  prefix: "indu-scope"
+
 database:
   default:
     type: "mysql"

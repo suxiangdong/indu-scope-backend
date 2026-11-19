@@ -78,8 +78,8 @@ func currentUserID(ctx context.Context) (uint64, error) {
 func toAPI(item favoriteModel.ProductItem) v1.FavoriteProductInfo {
 	return v1.FavoriteProductInfo{
 		FavoriteID: item.ID, ProductID: item.ProductID, ProductName: item.ProductName,
-		SupplierUserID: item.SupplierUserID, SupplierCompany: item.SupplierCompany,
-		CategoryID: item.CategoryID, CategoryName: item.CategoryName,
+		SupplierUserID: item.SupplierUserID,
+		CategoryID:     item.CategoryID, CategoryName: item.CategoryName,
 		StockQuantity: item.StockQuantity, StockUnitName: item.StockUnitName,
 		CoverURL: item.CoverURL, ImageCount: item.ImageCount, Status: item.Status,
 		FavoritedAt: item.FavoritedAt,

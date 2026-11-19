@@ -16,6 +16,7 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/model/entity"
 	"github.com/suxiangdong/indu-scope-backend/internal/pagination"
 	"github.com/suxiangdong/indu-scope-backend/internal/productstatus"
+	"github.com/suxiangdong/indu-scope-backend/internal/selectcache"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 	"github.com/suxiangdong/indu-scope-backend/internal/storage"
 )
@@ -66,7 +67,7 @@ func (s *sAdminProducts) Detail(ctx context.Context, id uint64) (adminProductMod
 		return adminProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "id is required"}
 	}
 	var product entity.Products
-	if err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", id).Scan(&product); err != nil {
+	if err := dao.Products.Ctx(ctx).Cache(selectcache.Query(dao.Products.Table(), id)).Where("id", id).Scan(&product); err != nil {
 		return adminProductModel.ProductItem{}, gerror.Wrap(err, "query product detail")
 	}
 	if product.Id == 0 {
@@ -112,7 +113,7 @@ func (s *sAdminProducts) UpdateStatus(ctx context.Context, id uint64, status uin
 	if id == 0 {
 		return adminProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "id is required"}
 	}
-	if err := productstatus.Change(dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", id), status); err != nil {
+	if err := productstatus.Change(dao.Products.Ctx(ctx).Where("id", id), status); err != nil {
 		return adminProductModel.ProductItem{}, err
 	}
 	return s.Detail(ctx, id)
@@ -122,7 +123,7 @@ func (s *sAdminProducts) Review(ctx context.Context, id uint64) (adminProductMod
 	if id == 0 {
 		return adminProductModel.ProductItem{}, &consts.InvalidParameterError{Message: "id is required"}
 	}
-	if err := productstatus.Approve(dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", id)); err != nil {
+	if err := productstatus.Approve(dao.Products.Ctx(ctx).Where("id", id)); err != nil {
 		return adminProductModel.ProductItem{}, err
 	}
 	return s.Detail(ctx, id)

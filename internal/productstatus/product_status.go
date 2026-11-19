@@ -11,6 +11,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 
 	"github.com/suxiangdong/indu-scope-backend/internal/consts"
+	"github.com/suxiangdong/indu-scope-backend/internal/selectcache"
 )
 
 const (
@@ -29,13 +30,13 @@ func Change(model *gdb.Model, status uint8) error {
 	if err != nil {
 		return err
 	}
-	if current == PendingReview && status != PendingReview {
+	if current.Status == PendingReview && status != PendingReview {
 		return consts.ErrProductPendingReview
 	}
-	if current == status {
+	if current.Status == status {
 		return nil
 	}
-	return compareAndSet(model, current, status)
+	return updateStatus(model, current.ID, status)
 }
 
 // Approve records a successful review without publishing the product. The
@@ -45,31 +46,34 @@ func Approve(model *gdb.Model) error {
 	if err != nil {
 		return err
 	}
-	if current != PendingReview {
+	if current.Status != PendingReview {
 		return consts.ErrProductAlreadyReviewed
 	}
-	return compareAndSet(model, PendingReview, Offline)
+	return updateStatus(model, current.ID, Offline)
 }
 
-func load(model *gdb.Model) (uint8, error) {
-	var current struct {
-		ID     uint64
-		Status uint8
-	}
+type productState struct {
+	ID     uint64
+	Status uint8
+}
+
+// The caller supplies an uncached model so review and owner checks always read
+// the database. A partial status query must never populate the full-row cache.
+func load(model *gdb.Model) (productState, error) {
+	var current productState
 	err := model.Clone().Fields("id", "status").Scan(&current)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && current.ID == 0) {
-		return 0, consts.ErrProductNotFound
+		return productState{}, consts.ErrProductNotFound
 	}
 	if err != nil {
-		return 0, gerror.Wrap(err, "query product status")
+		return productState{}, gerror.Wrap(err, "query product status")
 	}
-	return current.Status, nil
+	return current, nil
 }
 
-func compareAndSet(model *gdb.Model, current, next uint8) error {
-	// Keep the observed status in the UPDATE predicate: an intervening return
-	// to review must never be overwritten by a stale up/down request.
-	result, err := model.Clone().Where("status", current).Data(g.Map{"status": next}).Update()
+func updateStatus(model *gdb.Model, id uint64, next uint8) error {
+	// Keep the caller's ID and ownership scope without adding a status predicate.
+	result, err := model.Clone().Cache(selectcache.Invalidate("products", id)).Data(g.Map{"status": next}).Update()
 	if err != nil {
 		return gerror.Wrap(err, "update product status")
 	}
