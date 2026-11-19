@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"strings"
 	"time"
@@ -110,7 +110,9 @@ func (s *sVip) CreateOrder(ctx context.Context, userID, planID uint64, autoRenew
 		if _, err := rand.Read(random); err != nil {
 			return err
 		}
-		row := orderRow{OrderNo: "VIP" + now.Format("20060102150405") + hex.EncodeToString(random), UserID: userID, PlanID: planID,
+		// 3-character prefix + 12-character time + 16-character random suffix =
+		// 31 characters. Retain all 96 random bits within WeChat's 32-char limit.
+		row := orderRow{OrderNo: "VIP" + now.Format("060102150405") + base64.RawURLEncoding.EncodeToString(random), UserID: userID, PlanID: planID,
 			AmountFen: plan.PriceFen, Currency: plan.Currency, Status: "pending", PaymentMethod: "wechat_miniapp", Provider: "wechatpay",
 			PlanCodeSnapshot: plan.Code, PlanNameSnapshot: plan.Name, PlanDescriptionSnapshot: plan.Description,
 			OriginalPriceFenSnapshot: plan.OriginalPriceFen, PlanTypeSnapshot: planType, BillingCycleSnapshot: plan.BillingCycle,

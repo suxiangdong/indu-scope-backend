@@ -27,7 +27,27 @@ import (
 	"github.com/wechatpay-apiv3/wechatpay-go/utils"
 )
 
-var ErrDisabled = errors.New("微信支付暂未启用")
+var (
+	ErrDisabled       = errors.New("微信支付暂未启用")
+	ErrInvalidOrderNo = errors.New("WeChat Pay out_trade_no must contain 6 to 32 allowed ASCII characters")
+)
+
+// ValidateOrderNo applies the JSAPI contract before an invalid merchant order
+// number can reach prepay, query or close: https://pay.weixin.qq.com/doc/v3/merchant/4012791897
+func ValidateOrderNo(orderNo string) error {
+	if len(orderNo) < 6 || len(orderNo) > 32 {
+		return ErrInvalidOrderNo
+	}
+	for i := 0; i < len(orderNo); i++ {
+		c := orderNo[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			c == '_' || c == '-' || c == '|' || c == '*' {
+			continue
+		}
+		return ErrInvalidOrderNo
+	}
+	return nil
+}
 
 type Config struct {
 	Enabled                                                          bool
@@ -138,6 +158,9 @@ type Payment struct {
 }
 
 func (c *Client) Prepay(ctx context.Context, in PrepayInput) (*Payment, error) {
+	if err := ValidateOrderNo(in.OrderNo); err != nil {
+		return nil, err
+	}
 	if in.AmountFen <= 0 || in.OpenID == "" || in.OrderNo == "" || !in.ExpiresAt.After(time.Now()) {
 		return nil, errors.New("invalid WeChat Pay order")
 	}
@@ -174,12 +197,18 @@ func (c *Client) SignPayment(ctx context.Context, prepayID string) (*Payment, er
 }
 
 func (c *Client) Query(ctx context.Context, orderNo string) (*payments.Transaction, error) {
+	if err := ValidateOrderNo(orderNo); err != nil {
+		return nil, err
+	}
 	response, result, err := c.service.QueryOrderByOutTradeNo(ctx, jsapi.QueryOrderByOutTradeNoRequest{Mchid: core.String(c.Config.MchID), OutTradeNo: core.String(orderNo)})
 	logRequestID(ctx, "query", result)
 	return response, err
 }
 
 func (c *Client) Close(ctx context.Context, orderNo string) error {
+	if err := ValidateOrderNo(orderNo); err != nil {
+		return err
+	}
 	result, err := c.service.CloseOrder(ctx, jsapi.CloseOrderRequest{Mchid: core.String(c.Config.MchID), OutTradeNo: core.String(orderNo)})
 	logRequestID(ctx, "close", result)
 	return err

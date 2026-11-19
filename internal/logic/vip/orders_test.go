@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
@@ -51,6 +52,9 @@ func TestCheckoutRetryAfterSerializedCreation(t *testing.T) {
 			first, reused, err := s.CreateOrder(context.Background(), 2, 3, false, "same-checkout")
 			if err != nil || reused || first.ID != 10 || first.Status != wantStatus || first.AmountFen != price || first.DurationDaysSnapshot != 30 {
 				t.Fatalf("first=%+v reused=%t err=%v", first, reused, err)
+			}
+			if !regexp.MustCompile(`^[A-Za-z0-9_-]{6,32}$`).MatchString(first.OrderNo) {
+				t.Fatalf("generated merchant order number violates WeChat Pay's 6-32 character contract: length=%d", len(first.OrderNo))
 			}
 			expectCheckoutUserLock(mock)
 			mock.ExpectQuery("SELECT (.+) FROM `payment_orders`(.+)idempotency_key(.+)").WithArgs(uint64(2), "same-checkout").

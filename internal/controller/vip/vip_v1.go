@@ -12,6 +12,7 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/consts"
 	vipModel "github.com/suxiangdong/indu-scope-backend/internal/model/vip"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
+	"github.com/suxiangdong/indu-scope-backend/internal/wechatpay"
 )
 
 func (c *ControllerV1) Plans(ctx context.Context, _ *v1.PlansReq) (*v1.PlansRes, error) {
@@ -89,7 +90,10 @@ func (c *ControllerV1) PayOrder(ctx context.Context, req *v1.PayOrderReq) (*v1.P
 func checkoutResponse(ctx context.Context, userID, orderID uint64) (*v1.CreateOrderRes, error) {
 	checkout, err := service.Vip().PreparePayment(ctx, userID, orderID)
 	if err != nil {
-		g.Log().Errorf(ctx, "prepare vip payment failed: %v", err)
+		g.Log().Errorf(ctx, "prepare vip payment failed: user_id=%d order_id=%d: %v", userID, orderID, err)
+		if errors.Is(err, wechatpay.ErrInvalidOrderNo) {
+			return nil, gerror.NewCode(gcode.CodeBusinessValidationFailed, "订单编号不符合支付规范，请刷新会员中心后重新下单")
+		}
 		return nil, gerror.NewCode(gcode.CodeBusinessValidationFailed, "订单暂不可支付，请刷新会员中心后重试；若仍失败请联系管理员")
 	}
 	order := checkout.Order

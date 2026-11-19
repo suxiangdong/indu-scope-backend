@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -51,6 +52,9 @@ func (s *sVip) PreparePayment(ctx context.Context, userID, orderID uint64) (*vip
 	}
 	if row.DurationDaysSnapshot == 0 || row.DurationDaysSnapshot > maxMembershipDurationDays {
 		return nil, errors.New("订单有效天数快照无效，不能发起支付")
+	}
+	if err := wechatpay.ValidateOrderNo(row.OrderNo); err != nil {
+		return nil, err
 	}
 	client, err := wechatpay.Load(ctx)
 	if errors.Is(err, wechatpay.ErrDisabled) {
@@ -199,7 +203,15 @@ func (s *sVip) SyncOrder(ctx context.Context, userID, orderID uint64) (vipModel.
 	if err != nil {
 		return vipModel.Order{}, err
 	}
-	if row.Status == "paid" || row.Status == "closed" || row.Status == "refunded" || row.PaymentAppID == "" {
+	if row.Status == "paid" || row.Status == "closed" || row.Status == "refunded" {
+		return row.order(), nil
+	}
+	if legacyUnpayableOrderNo.MatchString(row.OrderNo) && (row.Status == "pending" || row.Status == "paying") {
+		// Recheck payment evidence under the same owner/order locks used by
+		// checkout and settlement before retiring an invalid legacy order.
+		return s.CancelOrder(ctx, userID, orderID)
+	}
+	if row.PaymentAppID == "" {
 		return row.order(), nil
 	}
 	client, err := wechatpay.Load(ctx)
@@ -268,6 +280,17 @@ func (s *sVip) markOrderClosed(ctx context.Context, orderID uint64) error {
 	return err
 }
 
+var legacyUnpayableOrderNo = regexp.MustCompile(`^VIP[0-9]{14}[0-9a-f]{24}$`)
+
+func canCloseLegacyUnpayableOrder(row orderRow) bool {
+	return legacyUnpayableOrderNo.MatchString(row.OrderNo) &&
+		(row.Status == "pending" || row.Status == "paying") &&
+		row.Provider == "wechatpay" && row.PaymentMethod == "wechat_miniapp" &&
+		row.PrepayID == "" && row.ProviderTransactionID == "" &&
+		row.PaidAt == nil && row.SubscriptionID == nil &&
+		row.EntitlementStartAt == nil && row.EntitlementEndAt == nil && row.EntitlementRevokedAt == nil
+}
+
 func (s *sVip) CancelOrder(ctx context.Context, userID, orderID uint64) (vipModel.Order, error) {
 	row, err := s.loadOrder(ctx, userID, orderID)
 	if err != nil {
@@ -289,7 +312,13 @@ func (s *sVip) CancelOrder(ctx context.Context, userID, orderID uint64) (vipMode
 		if current.Status == "paid" || current.Status == "closed" || current.Status == "refunded" {
 			return nil
 		}
-		if current.PaymentAppID != "" {
+		closeLegacyLocally := canCloseLegacyUnpayableOrder(current)
+		if legacyUnpayableOrderNo.MatchString(current.OrderNo) && !closeLegacyLocally {
+			// An unexpected payment/entitlement marker needs reconciliation;
+			// never interpret an invalid upstream order number as proof of no charge.
+			return wechatpay.ErrInvalidOrderNo
+		}
+		if current.PaymentAppID != "" && !closeLegacyLocally {
 			client, err := wechatpay.Load(ctx)
 			if err != nil {
 				return err
