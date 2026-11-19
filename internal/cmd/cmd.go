@@ -30,7 +30,6 @@ import (
 	adminVerificationController "github.com/suxiangdong/indu-scope-backend/internal/controller/adminverification"
 	adminVipController "github.com/suxiangdong/indu-scope-backend/internal/controller/adminvip"
 	analyticsController "github.com/suxiangdong/indu-scope-backend/internal/controller/analytics"
-	appContentController "github.com/suxiangdong/indu-scope-backend/internal/controller/appcontent"
 	"github.com/suxiangdong/indu-scope-backend/internal/controller/auth"
 	categoriesController "github.com/suxiangdong/indu-scope-backend/internal/controller/categories"
 	favoritesController "github.com/suxiangdong/indu-scope-backend/internal/controller/favorites"
@@ -112,8 +111,8 @@ var (
 			s.Group("/", func(group *ghttp.RouterGroup) {
 				group.Middleware(ghttp.MiddlewareHandlerResponse, middleware.HTTPErrorStatus, middleware.RateLimit(time.Minute, 30), middleware.Ctx)
 				group.Bind(categoriesController.NewV1())
-				group.Bind(appContentController.NewV1())
 			})
+			registerPublicAppContentRoutes(s)
 
 			// Verification and account endpoints are available to any logged-in
 			// user, including users whose profile status is still 0 (or has been
