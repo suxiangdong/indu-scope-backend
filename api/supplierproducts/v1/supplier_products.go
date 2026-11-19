@@ -5,6 +5,7 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
+	userprofilesv1 "github.com/suxiangdong/indu-scope-backend/api/userprofiles/v1"
 )
 
 type CategoryInfo struct {
@@ -138,7 +139,9 @@ type ContactInfo struct {
 type DetailRes struct {
 	g.Meta `mime:"application/json"`
 	ProductInfo
-	SupplierContacts []ContactInfo `json:"supplier_contacts"`
+	SupplierContacts []ContactInfo                  `json:"supplier_contacts"`
+	CompanyInfo      *userprofilesv1.CompanySummary `json:"company_info,omitempty"`
+	CompanyLocked    bool                           `json:"company_locked"`
 }
 
 type CreateRes struct {

@@ -41,6 +41,7 @@ import (
 	userProfileController "github.com/suxiangdong/indu-scope-backend/internal/controller/userprofile"
 	vipController "github.com/suxiangdong/indu-scope-backend/internal/controller/vip"
 	"github.com/suxiangdong/indu-scope-backend/internal/middleware"
+	"github.com/suxiangdong/indu-scope-backend/internal/selectcache"
 	"github.com/suxiangdong/indu-scope-backend/internal/sessionstore"
 	"github.com/suxiangdong/indu-scope-backend/internal/storage"
 	"github.com/suxiangdong/indu-scope-backend/internal/wechat"
@@ -52,6 +53,9 @@ var (
 		Usage: "main",
 		Brief: "start http server",
 		Func: func(ctx context.Context, parser *gcmd.Parser) (err error) {
+			if err := selectcache.Init(ctx); err != nil {
+				return err
+			}
 			db := g.DB()
 			dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
@@ -166,6 +170,7 @@ var (
 					middleware.Ctx,
 					middleware.RequireAuthenticated,
 					middleware.RequireVerified,
+					middleware.RequireActiveVip,
 				)
 				group.Bind(userProfileController.NewV1())
 			})

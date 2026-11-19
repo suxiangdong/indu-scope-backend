@@ -12,6 +12,7 @@ import (
 	"github.com/gogf/gf/v2/os/glog"
 
 	"github.com/suxiangdong/indu-scope-backend/api/supplierproducts/v1"
+	"github.com/suxiangdong/indu-scope-backend/internal/companyaccess"
 	"github.com/suxiangdong/indu-scope-backend/internal/consts"
 	supplierProductModel "github.com/suxiangdong/indu-scope-backend/internal/model/supplierproduct"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
@@ -83,11 +84,24 @@ func (c *ControllerV1) Detail(ctx context.Context, req *v1.DetailReq) (*v1.Detai
 	if err != nil {
 		return nil, toAPIError(ctx, err)
 	}
+	allowed, err := companyaccess.Allowed(ctx, uint64(user.ID))
+	if err != nil {
+		return nil, toAPIError(ctx, err)
+	}
+	var companyName string
+	if allowed {
+		profile, err := service.UserProfile().Profile(ctx, uint64(user.ID))
+		if err != nil {
+			return nil, toAPIError(ctx, err)
+		}
+		companyName = profile.CompanyName
+	}
 	contacts := make([]v1.ContactInfo, 0, len(result.Contacts))
 	for _, contact := range result.Contacts {
 		contacts = append(contacts, v1.ContactInfo{Name: contact.Name, Position: contact.Position, Phone: contact.Phone})
 	}
-	return &v1.DetailRes{ProductInfo: toAPI(result), SupplierContacts: contacts}, nil
+	return &v1.DetailRes{ProductInfo: toAPI(result), SupplierContacts: contacts,
+		CompanyInfo: companyaccess.Summary(uint64(user.ID), companyName, allowed), CompanyLocked: !allowed}, nil
 }
 
 func (c *ControllerV1) Create(ctx context.Context, req *v1.CreateReq) (*v1.CreateRes, error) {

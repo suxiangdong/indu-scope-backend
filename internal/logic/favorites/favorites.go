@@ -15,6 +15,7 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/model/entity"
 	favoriteModel "github.com/suxiangdong/indu-scope-backend/internal/model/favorite"
 	"github.com/suxiangdong/indu-scope-backend/internal/pagination"
+	"github.com/suxiangdong/indu-scope-backend/internal/selectcache"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 	"github.com/suxiangdong/indu-scope-backend/internal/storage"
 )
@@ -197,7 +198,7 @@ type favoriteRecord struct {
 func (s *sFavorites) hydrateFavoriteRecords(ctx context.Context, records []favoriteRecord) error {
 	for index := range records {
 		var product entity.Products
-		if err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", records[index].ProductID).Scan(&product); err != nil {
+		if err := dao.Products.Ctx(ctx).Cache(selectcache.Query(dao.Products.Table(), records[index].ProductID)).Where("id", records[index].ProductID).Scan(&product); err != nil {
 			return gerror.Wrap(err, "query favorite product")
 		}
 		if product.Id == 0 {

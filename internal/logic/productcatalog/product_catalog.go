@@ -14,6 +14,7 @@ import (
 	"github.com/suxiangdong/indu-scope-backend/internal/model/entity"
 	productCatalogModel "github.com/suxiangdong/indu-scope-backend/internal/model/productcatalog"
 	"github.com/suxiangdong/indu-scope-backend/internal/pagination"
+	"github.com/suxiangdong/indu-scope-backend/internal/selectcache"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
 	"github.com/suxiangdong/indu-scope-backend/internal/storage"
 )
@@ -84,7 +85,7 @@ func (s *sProductCatalog) Detail(ctx context.Context, buyerUserID, productID uin
 		return productCatalogModel.ProductDetail{}, &consts.InvalidParameterError{Message: "id is required"}
 	}
 	var product entity.Products
-	if err := dao.Products.Ctx(ctx).Cache(gdb.CacheOption{}).Where("id", productID).Scan(&product); err != nil {
+	if err := dao.Products.Ctx(ctx).Cache(selectcache.Query(dao.Products.Table(), productID)).Where("id", productID).Scan(&product); err != nil {
 		return productCatalogModel.ProductDetail{}, gerror.Wrap(err, "query buyer product availability")
 	}
 	if product.Id == 0 {

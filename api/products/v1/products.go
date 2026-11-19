@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
+	userprofilesv1 "github.com/suxiangdong/indu-scope-backend/api/userprofiles/v1"
 )
 
 type ListReq struct {
@@ -64,10 +65,12 @@ type ContactInfo struct {
 type DetailRes struct {
 	g.Meta `mime:"application/json"`
 	ProductInfo
-	Images           []ProductImageInfo   `json:"images"`
-	Attributes       []AttributeValueInfo `json:"attributes"`
-	SupplierContacts []ContactInfo        `json:"supplier_contacts"`
-	ContactLocked    bool                 `json:"contact_locked"`
+	Images           []ProductImageInfo             `json:"images"`
+	Attributes       []AttributeValueInfo           `json:"attributes"`
+	SupplierContacts []ContactInfo                  `json:"supplier_contacts"`
+	ContactLocked    bool                           `json:"contact_locked"`
+	CompanyInfo      *userprofilesv1.CompanySummary `json:"company_info,omitempty"`
+	CompanyLocked    bool                           `json:"company_locked"`
 }
 
 type ListRes struct {

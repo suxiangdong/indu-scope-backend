@@ -12,6 +12,7 @@ import (
 	"github.com/gogf/gf/v2/os/glog"
 
 	"github.com/suxiangdong/indu-scope-backend/api/procurementrequirements/v1"
+	"github.com/suxiangdong/indu-scope-backend/internal/companyaccess"
 	"github.com/suxiangdong/indu-scope-backend/internal/consts"
 	procurementRequirementModel "github.com/suxiangdong/indu-scope-backend/internal/model/procurementrequirement"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
@@ -116,13 +117,22 @@ func (c *ControllerV1) Detail(ctx context.Context, req *v1.DetailReq) (*v1.Detai
 	if err != nil {
 		return nil, toAPIError(ctx, err)
 	}
+	companyAllowed, err := companyaccess.Allowed(ctx, uint64(user.ID))
+	if err != nil {
+		return nil, toAPIError(ctx, err)
+	}
 	contacts := make([]v1.ContactInfo, 0, len(result.BuyerContacts))
 	for _, contact := range result.BuyerContacts {
 		contacts = append(contacts, v1.ContactInfo{Name: contact.Name, Position: contact.Position, Phone: contact.Phone})
 	}
-	res := &v1.DetailRes{Requirement: toAPIRequirement(result.Requirement), Responses: make([]v1.RequirementResponseInfo, 0, len(result.Responses)), BuyerContacts: contacts}
+	res := &v1.DetailRes{
+		Requirement:   toAPIRequirement(result.Requirement),
+		CompanyInfo:   companyaccess.Summary(result.Requirement.BuyerUserID, result.Requirement.BuyerCompany, companyAllowed),
+		CompanyLocked: !companyAllowed,
+		Responses:     make([]v1.RequirementResponseInfo, 0, len(result.Responses)), BuyerContacts: contacts,
+	}
 	for _, item := range result.Responses {
-		res.Responses = append(res.Responses, toAPIResponse(item))
+		res.Responses = append(res.Responses, toAPIResponse(item, companyAllowed))
 	}
 	return res, nil
 }
@@ -232,7 +242,7 @@ func (c *ControllerV1) CreateResponse(ctx context.Context, req *v1.CreateRespons
 	if err != nil {
 		return nil, toAPIError(ctx, err)
 	}
-	return &v1.CreateResponseRes{RequirementResponseInfo: toAPIResponse(result)}, nil
+	return &v1.CreateResponseRes{RequirementResponseInfo: toAPIResponse(result, false)}, nil
 }
 
 func (c *ControllerV1) UpdateResponseStatus(ctx context.Context, req *v1.UpdateResponseStatusReq) (*v1.UpdateResponseStatusRes, error) {
@@ -250,7 +260,7 @@ func (c *ControllerV1) UpdateResponseStatus(ctx context.Context, req *v1.UpdateR
 	if err != nil {
 		return nil, toAPIError(ctx, err)
 	}
-	return &v1.UpdateResponseStatusRes{RequirementResponseInfo: toAPIResponse(result)}, nil
+	return &v1.UpdateResponseStatusRes{RequirementResponseInfo: toAPIResponse(result, false)}, nil
 }
 
 func currentVerifiedUser(ctx context.Context) (*authUser, error) {
@@ -279,7 +289,7 @@ func toAPIRequirement(item procurementRequirementModel.RequirementItem) v1.Requi
 		files = append(files, v1.RequirementFileInfo{ID: file.ID, Endpoint: file.Endpoint, Bucket: file.Bucket, Path: file.Path, URL: file.URL, OriginalName: file.OriginalName, ContentType: file.ContentType, Size: file.Size, SortOrder: file.SortOrder, CreatedAt: file.CreatedAt})
 	}
 	return v1.RequirementInfo{
-		ID: item.ID, BuyerUserID: item.BuyerUserID, BuyerCompany: item.BuyerCompany,
+		ID: item.ID, BuyerUserID: item.BuyerUserID,
 		CategoryID: item.CategoryID, CategoryName: item.CategoryName, CategoryNameSnapshot: item.CategoryNameSnapshot,
 		Name: item.Name, Quantity: item.Quantity, StockUnitID: item.StockUnitID, StockUnitName: item.StockUnitName,
 		StockUnitNameSnapshot: item.StockUnitNameSnapshot, Description: item.Description,
@@ -290,8 +300,13 @@ func toAPIRequirement(item procurementRequirementModel.RequirementItem) v1.Requi
 	}
 }
 
-func toAPIResponse(item procurementRequirementModel.ResponseItem) v1.RequirementResponseInfo {
-	return v1.RequirementResponseInfo{ID: item.ID, RequirementID: item.RequirementID, SupplierUserID: item.SupplierUserID, SupplierCompany: item.SupplierCompany, Message: item.Message, AvailableQuantity: item.AvailableQuantity, LeadTimeDays: item.LeadTimeDays, Status: item.Status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt}
+func toAPIResponse(item procurementRequirementModel.ResponseItem, companyAllowed bool) v1.RequirementResponseInfo {
+	return v1.RequirementResponseInfo{
+		ID: item.ID, RequirementID: item.RequirementID, SupplierUserID: item.SupplierUserID,
+		CompanyInfo: companyaccess.Summary(item.SupplierUserID, item.SupplierCompany, companyAllowed), CompanyLocked: !companyAllowed,
+		Message: item.Message, AvailableQuantity: item.AvailableQuantity, LeadTimeDays: item.LeadTimeDays,
+		Status: item.Status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
+	}
 }
 
 func toAPIError(ctx context.Context, err error) error {

@@ -3,12 +3,12 @@ package middleware
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/net/ghttp"
 
+	"github.com/suxiangdong/indu-scope-backend/internal/companyaccess"
 	authmodel "github.com/suxiangdong/indu-scope-backend/internal/model/auth"
 	model "github.com/suxiangdong/indu-scope-backend/internal/model/bizctx"
 	"github.com/suxiangdong/indu-scope-backend/internal/service"
@@ -106,7 +106,7 @@ func RequireVerified(r *ghttp.Request) {
 	RequireStatus(UserStatusVerified)(r)
 }
 
-// RequireActiveVip protects paid write operations. It must be placed after
+// RequireActiveVip protects member-only operations and company profiles. It must be placed after
 // Ctx and RequireAuthenticated; verified users without an active subscription
 // receive a 403 instead of an authentication error.
 func RequireActiveVip(r *ghttp.Request) {
@@ -119,13 +119,13 @@ func RequireActiveVip(r *ghttp.Request) {
 		setForbidden(r, "verified profile is required")
 		return
 	}
-	subscription, err := service.Vip().GetSubscription(r.Context(), uint64(user.ID))
+	allowed, err := companyaccess.Allowed(r.Context(), uint64(user.ID))
 	if err != nil {
 		r.Response.Status = http.StatusInternalServerError
 		r.SetError(gerror.NewCode(gcode.CodeInternalError, "internal server error"))
 		return
 	}
-	if subscription == nil || (subscription.EndAt != nil && !subscription.EndAt.After(time.Now())) {
+	if !allowed {
 		setForbidden(r, "active VIP membership is required")
 		return
 	}
